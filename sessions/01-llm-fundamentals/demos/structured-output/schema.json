@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ConceptLookupResult",
+  "type": "object",
+  "properties": {
+    "term": {"type": "string"},
+    "found": {"type": "boolean"},
+    "explanation": {"type": "string"}
+  },
+  "required": ["term", "found", "explanation"],
+  "additionalProperties": false
+}
