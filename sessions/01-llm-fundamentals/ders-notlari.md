@@ -2,7 +2,7 @@
 
 [Oturuma dön](README.md) | [English](lesson-notes.md) | [Sözlük](kavram-sozlugu.md)
 
-Bu notlar birinci oturumun başvuru kaynağıdır. Öğrenme sırası LLM → Token → Vektör / Matris / Gömme → İşlev / API / Araç → Yapılandırılmış Çıktı / Şema şeklindedir; **bu sıralama her modelin birebir çalışma hattı değildir**. Deneyler için [Colab defterini veya yerel LLM deney alanını](demos/llm-playground/README.md) ve [çevrimdışı yapılandırılmış çıktı demosunu](demos/structured-output/README.md) kullanabilirsin.
+Bu notlar birinci oturumun başvuru kaynağıdır. Öğrenme sırası LLM → Token → Vektör / Matris / Gömme → İşlev / API / Araç → Yapılandırılmış Çıktı / Şema şeklindedir; **bu sıralama her modelin birebir çalışma hattı değildir**. Deneyler için [Colab deney alanını](demos/llm-playground/README.md) ve [yapılandırılmış çıktı incelemesini](demos/structured-output/README.md) kullanabilirsin.
 
 ## 1. LLM ve ajan ilişkisi
 
@@ -18,19 +18,19 @@ Bir **ajan sistemi**, modelin çevresine bağlam hazırlama, araç önerilerini 
 
 **Token ID**, belirli tokenizer sözlüğündeki bir tokenın kimliğidir; tek başına vektör veya olasılık değildir. Unicode metin bazen birkaç tokenın baytlarıyla temsil edilir. Tek bir token ayrı çözümlendiğinde `�` gibi eksik bir karakter görülebilir; bu durum tek başına özgün metnin hatalı olduğu anlamına gelmez.
 
-**Context window (bağlam penceresi)**, modelin bir seferde ele alabildiği token bütçesidir. Girdi ve konuşma geçmişi ile üretilecek tokenlar için ayrılan yer birlikte düşünülür. Modelin yapılandırılmış üst sınırı, kullanılan cihazın o uzunlukta çalışabileceğini garanti etmez; yerel demo sunucusunun ayarı ayrıca daha düşük olabilir.
+**Context window (bağlam penceresi)**, modelin bir seferde ele alabildiği token bütçesidir. Girdi ve konuşma geçmişi ile üretilecek tokenlar için ayrılan yer birlikte düşünülür. Modelin yapılandırılmış üst sınırı, kullanılan donanımın veya defter ayarının o uzunlukta çalışabileceğini garanti etmez.
 
 ### Deney A: İki dilde tokenlar
 
-Colab'daki **3. bölümde (Tokenlara bak)** iki metni `Merhaba dünya!` ve `Hello world!` olarak dene; varsayılan örneklerin sonundaki el emojisini iki metinden de çıkar. Yerel arayüzde **Tokenlaştırma** moduna metinleri sırayla gir. Token sayısını, bir parçayı ve onun ID'sini kaydet. Tek bir örnekten dillerin tümü hakkında genelleme yapma.
+Colab'daki **3. bölümde (Tokenlara bak)** (`3A`–`3B`) iki metni `Merhaba dünya!` ve `Hello world!` olarak dene; varsayılan örneklerin sonundaki el emojisini iki metinden de çıkar. Token sayısını, bir parçayı ve onun ID'sini kaydet. Tek bir örnekten dillerin tümü hakkında genelleme yapma.
 
 ### Deney B: Üretim ve örnekleme
 
 Modelin **ham olasılık dağılımı**, belirli bağlamda aday sonraki tokenlara ilişkin tahminidir. Görülen ilk birkaç adayın olasılıkları %100'e toplanmak zorunda değildir; başka adaylar da vardır. Temperature, top-k ve top-p gibi **örnekleme** ayarları seçimi etkileyebilir. Düşük temperature daha olası seçenekleri öne çıkarabilir; yüksek değer dağılımı daha yaygın hâle getirebilir. Top-k aday sayısını, top-p ise olasılık eşiğine göre aday kümesini sınırlar.
 
-Colab'da **4. bölüm (Gerçek sonraki token olasılıkları)**, yerelde **Üretim ve olasılıklar** bölümünü aç. İlk metin olarak `Bugün hava` kullan. Top-k ve top-p sabitken yalnız temperature'ı değiştir; Colab'daki ikinci çağrının `top_k` ve `top_p` değerlerini 20 ve 0.9 yap; sonra ilk ayarlara dönüp bağlamı `Kışın dağlarda bugün hava` yap. Aynı bağlamda ham dağılımı örnekleme sonrası dağılımla karıştırma. Yerel üretim sınırını 1 yapmak bir yeni token üretir; daha uzun üretim için sınır artırılabilir.
+Colab'da **4. bölüm (Gerçek sonraki token olasılıkları)** (`4A`–`4C`) bölümünü aç (ardından `5A`–`5B` ile deterministik ve örneklemeli metin üretimini karşılaştırabilirsin). İlk metin olarak `Bugün hava` kullan. Top-k ve top-p sabitken yalnız temperature'ı değiştir; ikinci çağrının `top_k` ve `top_p` değerlerini 20 ve 0.9 yap; sonra ilk ayarlara dönüp bağlamı `Kışın dağlarda bugün hava` yap. Aynı bağlamda ham dağılımı örnekleme sonrası dağılımla karıştırma.
 
-Colab tam model ağırlıklarını, yerel demo ise küçültülmüş GGUF sürümünü ve farklı bir çalıştırma yolunu kullanır. Sayılar ve örnekleme ayrıntıları birebir aynı olmak zorunda değildir; gözlemlenen değerleri karşılaştırırken bu farkı göz önünde tut.
+Colab defteri Qwen3.5-0.8B model ağırlıklarıyla olasılık ve örnekleme adımlarını gözlemletir; kullanılan GPU veya CPU çalışma zamanına göre süreler değişebilir.
 
 ## 3. Vektör / Matris / Gömme (Embedding)
 
@@ -52,7 +52,7 @@ Bir **function (işlev)**, çağrıldığında tanımlı bir iş yapan kod parç
 
 Aşağıdaki diyagram bir **örnek akış** gösterir. Modelin önerisi kodu kendiliğinden çalıştırmaz; uygulama veya harness izinleri ve girdileri kontrol eder:
 
-```mermaid
+`�``mermaid
 flowchart TD
     A["Kullanıcı isteği"] --> B["Model araç çağrısını önerir"]
     B --> C{"Uygulama izni ve girdileri kontrol eder"}
@@ -61,11 +61,11 @@ flowchart TD
     D --> E["Araç sonucu uygulamaya döner"]
     E --> F["Uygulama sonucu modele iletir"]
     F --> G["Model yanıt veya sonraki adımı önerir"]
-```
+`�``
 
 ### Deney C: Bir sözlük aracını gözlemle
 
-Colab'daki **6. bölüm (Araç çağrısı)** hücresini veya yerel **Araç çağrısı** modunu aç. `What is a token? Use lookup_term first.` sorusuyla dene. Model araç adını ve `term` argümanını önerirse, harness yalnız izin verilen tek çağrıyı ve argümanı doğrular; yerel sabit sözlükten gelen gerçek sonuç modele iletilir. Hangi adımın model, hangisinin uygulama tarafından yapıldığını ayrı ayrı kaydet. Model çağrı önermezse veya öneri geçerli değilse araç çalıştırılmaz.
+Colab'daki **6. bölüm (Araç çağrısı)** (`6A`–`6C`) hücrelerini aç. `What is a token? Use lookup_term first.` sorusuyla dene. Model araç adını ve `term` argümanını önerirse, harness yalnız izin verilen tek çağrıyı ve argümanı doğrular; sabit sözlükten gelen gerçek sonuç modele iletilir. Hangi adımın model, hangisinin uygulama tarafından yapıldığını ayrı ayrı kaydet. Model çağrı önermezse veya öneri geçerli değilse araç çalıştırılmaz.
 
 ## 5. Yapılandırılmış Çıktı / Şema ve JSON
 
@@ -73,12 +73,12 @@ Colab'daki **6. bölüm (Araç çağrısı)** hücresini veya yerel **Araç ça�
 
 Aşağıdaki örnek demo şemasına uyar ama açıklaması yanlıştır:
 
-```json
+`�``json
 {"term": "token", "found": true, "explanation": "Token her zaman bir kelimedir."}
-```
+`�``
 
 `found` alanını `"true"` yaparsan sonuç hâlâ geçerli JSON'dur; ancak değer boolean yerine metin olduğundan demo şemasına uymaz. Şema, türleri doğru bir açıklamanın anlamsal olarak doğru olduğunu tek başına kanıtlamaz.
 
-### Deney D: Çevrimdışı şema kontrolü
+### Deney D: Şema ve doğruluk karşılaştırması
 
-[Mini demoyu](demos/structured-output/README.md) `token` ve bilinmeyen bir kavramla çalıştır; `term`, `found` ve `explanation` alanlarını incele. Aynı demodaki `schema_lab.py`, kasten yanlış açıklama örneğinin şemayı geçtiğini ve `found` alanının metin yapılmasıyla şemanın reddedildiğini gösterir. Demo **LLM veya harici API çağırmaz**. Yerel doğrulayıcı yalnız demo şemasında kullanılan küçük özellik kümesini kontrol eder, genel amaçlı JSON Schema doğrulayıcısı değildir. Pratik sorular [alıştırmalar](exercises/README.md) bölümündedir.
+[Yapılandırılmış çıktı incelemesinde](demos/structured-output/README.md) yer alan [şema dosyasını](demos/structured-output/schema.json) yukarıdaki iki JSON örneğiyle karşılaştır. İlk nesne `term`, `found` ve `explanation` alanlarının tür kurallarını karşılar fakat açıklaması **bilerek yanlıştır**. `found` alanı `"true"` yapılan ikinci örnek ise geçerli JSON olsa da `boolean` beklentisini bozduğu için şemadan kalır. Bu karşılaştırma kavramsaldır ve harici bir API veya LLM çağırmaz. Pratik sorular [alıştırmalar](exercises/README.md) bölümündedir.

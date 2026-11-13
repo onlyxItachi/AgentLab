@@ -1,44 +1,45 @@
-# Mini demo: Tool function and structured output
+# Conceptual walkthrough: Tool function and structured output
 
 [Back to demos](../README.en.md) | [Türkçe](README.md)
 
-**Status:** Working local starter example. This demo does not call an LLM, a real agent, or an external API. It calls a fixed concept table like a tool function and checks the result against a small schema. The real AI agent the instructor will use has not been selected.
+This walkthrough illustrates how a JSON payload from a glossary lookup relates to the rules in the [schema file](schema.json). It does not call an LLM or an external API.
 
-First complete the [setup guide](../../../../setup/README.en.md). Open a terminal at the repository root, enter the demo folder, and use the commands for your system:
+## Expected schema fields
 
-```text
-cd sessions/01-llm-fundamentals/demos/structured-output
+The [schema file](schema.json) requires exactly three fields (`term`, `found`, `explanation`) and forbids extras (`additionalProperties: false`):
+
+- `term`: concept name (`string`)
+- `found`: whether the concept exists in the glossary (`boolean`)
+- `explanation`: explanation text (`string`)
+
+Example payload for a known term:
+
+```json
+{"term": "token", "found": true, "explanation": "A unit produced by a tokenizer and processed by a model."}
 ```
 
-macOS / Linux:
+Example payload for an unknown term:
 
-```sh
-../../../../.agentlab/venv/bin/python demo.py --term token --language en
-../../../../.agentlab/venv/bin/python demo.py --term unknown --language en
-../../../../.agentlab/venv/bin/python demo.py --term schema --language en
+```json
+{"term": "unknown", "found": false, "explanation": "Term was not found in the glossary."}
 ```
 
-Windows PowerShell:
-
-```powershell
-..\..\..\..\.agentlab\venv\Scripts\python.exe demo.py --term token --language en
-..\..\..\..\.agentlab\venv\Scripts\python.exe demo.py --term unknown --language en
-..\..\..\..\.agentlab\venv\Scripts\python.exe demo.py --term schema --language en
-```
-
-Observe the `term`, `found`, and `explanation` fields. The [schema file](schema.json) describes fields and types. The [source code](demo.py) locally checks only the small feature subset used in this schema; it is not a general JSON Schema validator. Schema compliance alone does not prove an explanation is correct.
-
-The demo makes no network connections and creates no persistent resources. See the [setup guide](../../../../setup/README.en.md) for the project environment.
+Schema compliance alone does not establish that an explanation is factually true.
 
 ## Experiment D: Separate structure from truth
 
-This small companion runs two examples through the same actual validator:
+Compare these two payloads against the [schema file](schema.json):
 
-```text
-# macOS / Linux
-../../../../.agentlab/venv/bin/python schema_lab.py --language en
-# Windows PowerShell
-..\..\..\..\.agentlab\venv\Scripts\python.exe schema_lab.py --language en
+1. **Object A** (valid JSON and schema-compliant, yet its explanation is **intentionally false**):
+
+```json
+{"term": "token", "found": true, "explanation": "A token is always a word."}
 ```
 
-Object A is valid JSON and passes the schema, but its explanation is **intentionally false**. B is valid JSON too, but fails the schema because `found` is a string rather than a boolean. The validator does not check whether the explanation is true. The example runs offline and makes no model call.
+2. **Object B** (valid JSON, yet rejected by the schema because `found` is a string instead of a boolean):
+
+```json
+{"term": "token", "found": "true", "explanation": "A unit produced by a tokenizer and processed by a model."}
+```
+
+Being valid JSON, conforming to a schema, and containing accurate content are three separate checks.

@@ -2,25 +2,19 @@
 
 **Language:** [Türkçe](README.md) | English
 
-AgentLab is a draft introduction to Agentic AI across six sessions of approximately 90 minutes. It combines explanations, examples, and practical activities, with beginners in mind.
+AgentLab is an educational repository introducing Agentic AI concepts through hands-on sessions, explanations, and interactive Colab notebooks, designed with beginners in mind.
 
-> Materials are being developed gradually. Session 1 notes, glossary, demos, and exercises are available; materials for the remaining sessions are in preparation.
+> Lesson notes, glossaries, conceptual exercises, and self-contained Google Colab notebooks for sessions one and two are provided here. Materials for later sessions will be added as they become ready.
 
 ## Sessions
 
 1. [LLM Fundamentals](sessions/01-llm-fundamentals/README.en.md)
-2. Agent Core & State — in preparation
-3. Modern Agent Stack — in preparation
-4. Security & Execution — in preparation
-5. Infrastructure & Evals — in preparation
-6. Workshop / Capstone — in preparation
+2. [Agent Architecture, Context and Memory](sessions/02-agent-core-and-state/README.en.md)
 
 ## Get started
 
 - [General glossary](docs/en/glossary.md)
-- [Step-by-step setup for beginners](setup/README.en.md)
-- [Session 1 offline mini demo](sessions/01-llm-fundamentals/demos/structured-output/README.en.md)
+- [Session 1 Colab playground](sessions/01-llm-fundamentals/demos/llm-playground/README.en.md)
+- [Session 2 G4 Colab demos](sessions/02-agent-core-and-state/demos/README.en.md)
 
-The first-session Colab and local LLM playground use Qwen3.5-0.8B; a GPU is not required. The offline structured-output demo does not call a model. Model choices and participant access for later sessions remain undecided.
-
-Printable PDFs will be shared separately through Google Drive. When available, post-class recordings will be linked from the relevant session pages as unlisted YouTube videos.
+Both sessions run directly in Google Colab without installing Python or setting up a local environment. Session one's [Colab notebook](sessions/01-llm-fundamentals/demos/llm-playground/AgentLab-Colab.ipynb) observes tokens, next-token probabilities, sampling, and tool calling with Qwen3.5-0.8B. Session two's self-contained [G4 Colab notebook](sessions/02-agent-core-and-state/demos/agent-core/AgentLab-Session02-G4.ipynb) pairs a model-free `ScriptedModel` preview with Google's Gemma 4 12B QAT model, matching MTP assistant, and pinned llama.cpp CUDA runtime (262,144 default context capacity) for harness, context, memory, and RAG experiments. Model downloads and VM termination require explicit confirmation in the notebook.

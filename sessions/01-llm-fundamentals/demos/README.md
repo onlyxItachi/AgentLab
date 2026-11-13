@@ -2,6 +2,6 @@
 
 [Oturuma dön](../README.md) | [English](README.en.md)
 
-[Araç işlevi ve yapılandırılmış çıktı](structured-output/README.md): çevrimdışı, çalışır başlangıç örneği. Gerçek bir model çağırmaz.
+[LLM deney alanı](llm-playground/README.md): Colab defteriyle Qwen3.5-0.8B üzerinde token, olasılık ve araç çağrısı deneyleri.
 
-[LLM deney alanı](llm-playground/README.md): Colab defteri ve yerel modelle token, olasılık ve araç çağrısı deneyleri.
+[Yapılandırılmış çıktı ve şema](structured-output/README.md): kavram şeması ve geçerli JSON / şema / doğruluk ayrımı incelemesi. Gerçek bir model çağırmaz.

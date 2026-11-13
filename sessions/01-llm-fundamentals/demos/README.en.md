@@ -2,6 +2,6 @@
 
 [Back to session](../README.en.md) | [Türkçe](README.md)
 
-[Tool function and structured output](structured-output/README.en.md): working offline starter example. It does not call a real model.
+[LLM playground](llm-playground/README.en.md): Colab notebook experiments for tokens, probabilities, and tool calling with Qwen3.5-0.8B.
 
-[LLM playground](llm-playground/README.en.md): Colab notebook and local model experiments for tokens, probabilities, and tool calling.
+[Structured output and schema](structured-output/README.en.md): conceptual walkthrough separating valid JSON, schema compliance, and factual correctness. It does not call a real model.

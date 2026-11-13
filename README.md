@@ -2,25 +2,19 @@
 
 **Dil:** Türkçe | [English](README.en.md)
 
-AgentLab, ajan odaklı yapay zekâ (Agentic AI) kavramlarını altı yaklaşık 90 dakikalık oturumda açıklamalar, örnekler ve uygulamalarla ele alan bir eğitim taslağıdır. Yeni başlayanlar da hedef kitlededir.
+AgentLab, ajan odaklı yapay zekâ (Agentic AI) kavramlarını uygulamalı oturumlarla, açıklamalar ve etkileşimli Colab defterleriyle ele alan eğitim deposudur. Yeni başlayanlar da hedef kitlededir.
 
-> İçerikler aşamalı olarak hazırlanıyor. Birinci oturumun notları, sözlüğü, demoları ve alıştırmaları yayımlandı; diğer oturumların materyalleri hazırlanıyor.
+> İlk iki oturumun ders notları, sözlükleri, kavramsal alıştırmaları ve bağımsız Google Colab defterleri burada sunulur. Sonraki oturumların materyalleri hazırlandıkça eklenecektir.
 
 ## Oturumlar
 
 1. [LLM Temelleri](sessions/01-llm-fundamentals/README.md)
-2. Ajan Mimarisi ve Bellek — hazırlanıyor
-3. Modern Ajan Sistemleri — hazırlanıyor
-4. Güvenlik ve Yürütme — hazırlanıyor
-5. Altyapı, Performans ve Değerlendirme — hazırlanıyor
-6. Uygulamalı Atölye — hazırlanıyor
+2. [Ajan Mimarisi, Bağlam ve Bellek](sessions/02-agent-core-and-state/README.md)
 
 ## Başlangıç
 
 - [Genel kavram sözlüğü](docs/tr/kavram-sozlugu.md)
-- [Python bilmeyenler için adım adım kurulum](setup/README.md)
-- [İlk oturumun çevrimdışı mini demosu](sessions/01-llm-fundamentals/demos/structured-output/README.md)
+- [Birinci oturum Colab deney alanı](sessions/01-llm-fundamentals/demos/llm-playground/README.md)
+- [İkinci oturum G4 Colab demoları](sessions/02-agent-core-and-state/demos/README.md)
 
-Birinci oturumun Colab ve yerel LLM deney alanında Qwen3.5-0.8B kullanılır; GPU zorunlu değildir. Çevrimdışı yapılandırılmış çıktı demosu ise bir model çağırmaz. Diğer oturumların model ve katılımcı erişimi seçimleri henüz kesinleşmedi.
-
-Basılabilir PDF materyalleri Google Drive üzerinden ayrıca paylaşılacak. Ders sonrası anlatım videoları hazır olduğunda ilgili oturum sayfalarına liste dışı YouTube bağlantıları eklenecek.
+Her iki oturum da Python veya yerel ortam kurmadan Google Colab üzerinden çalıştırılabilir. Birinci oturumun [Colab defteri](sessions/01-llm-fundamentals/demos/llm-playground/AgentLab-Colab.ipynb), Qwen3.5-0.8B ile token, sonraki token olasılıkları, örnekleme ve araç çağrısı adımlarını gözlemletir. İkinci oturumun bağımsız [G4 Colab defteri](sessions/02-agent-core-and-state/demos/agent-core/AgentLab-Session02-G4.ipynb), modelsiz `ScriptedModel` önizlemesinin ardından Google'ın Gemma 4 12B QAT modeli, eşleşen MTP assistant ve pinli llama.cpp CUDA çalışma zamanıyla 262.144 varsayılan context kapasitesi üzerinde harness, bağlam, bellek ve RAG deneyleri sağlar. Model indirmeleri ve VM sonlandırma adımları defterde açık onay gerektirir.

@@ -4,7 +4,7 @@
 
 **Süre:** Yaklaşık 90 dakika
 
-**Durum:** İlk oturum notları, sözlük, alıştırmalar, Colab ve yerel demolar hazır; canlı ders akışı gerektiğinde uyarlanabilir.
+**Durum:** İlk oturum ders notları, oturum sözlüğü, Colab deney alanı, yapılandırılmış çıktı incelemesi ve kavramsal alıştırmalar hazır; canlı ders akışı gerektiğinde uyarlanabilir.
 
 ## Amaç ve kapsam
 
@@ -18,4 +18,4 @@ Bu sıralama dersin anlatım sırasıdır; her modelin birebir çalışma akış
 
 [Ders notları](ders-notlari.md) | [Oturum sözlüğü](kavram-sozlugu.md) | [Demolar](demos/README.md) | [Alıştırmalar](exercises/README.md)
 
-Basılabilir PDF ve ders sonrası video bağlantıları hazır olduğunda ayrıca paylaşılacak. Sonraki oturumun materyalleri hazırlanıyor.
+[Sonraki: Ajan Mimarisi, Bağlam ve Bellek](../02-agent-core-and-state/README.md)

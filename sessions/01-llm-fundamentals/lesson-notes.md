@@ -2,7 +2,7 @@
 
 [Back to session](README.en.md) | [Türkçe](ders-notlari.md) | [Glossary](glossary.md)
 
-These notes are a reference for session one. The teaching order is LLM → Token → Vector / Matrix / Embedding → Function / API / Tool → Structured Output / Schema; **this is not the literal execution pipeline of every model**. For the activities use the [Colab notebook or local LLM playground](demos/llm-playground/README.en.md) and the [offline structured-output demo](demos/structured-output/README.en.md).
+These notes are a reference for session one. The teaching order is LLM → Token → Vector / Matrix / Embedding → Function / API / Tool → Structured Output / Schema; **this is not the literal execution pipeline of every model**. For the activities use the [Colab playground](demos/llm-playground/README.en.md) and the [structured-output walkthrough](demos/structured-output/README.en.md).
 
 ## 1. LLMs and their relationship to agents
 
@@ -18,19 +18,19 @@ A **tokenizer** divides text into the tokens used by the model. A token may be a
 
 A **token ID** identifies a token in a particular tokenizer's vocabulary; it is neither a vector nor a probability. Unicode text may span byte fragments across several tokens. Decoding a token on its own can show a replacement character such as `�`; that alone does not mean the original text was broken.
 
-The **context window** is the token budget a model can process at one time. Input and conversation history, together with space reserved for generation, use that budget. A model's configured maximum does not guarantee that a given device can handle that length; the local demo server can be configured with a smaller limit.
+The **context window** is the token budget a model can process at one time. Input and conversation history, together with space reserved for generation, use that budget. A model's configured maximum does not guarantee that a given hardware runtime or notebook limit will support that length.
 
 ### Experiment A: Tokens in two languages
 
-In Colab, use section **3 (Inspect tokens)** with `Merhaba dünya!` and `Hello world!`; remove the waving-hand emoji from both default examples. In the local interface, enter each text under **Tokenization**. Record the token count and one piece with its ID. Do not generalize about entire languages from one example.
+In Colab, use section **3 (Inspect tokens)** (`3A`–`3B`) with `Merhaba dünya!` and `Hello world!`; remove the waving-hand emoji from both default examples. Record the token count and one piece with its ID. Do not generalize about entire languages from one example.
 
 ### Experiment B: Generation and sampling
 
 The model's **raw probability distribution** is its prediction over candidate next tokens for a particular context. The top few displayed probabilities need not sum to 100% because other candidates exist. **Sampling** settings such as temperature, top-k, and top-p can affect selection. A lower temperature can favor the most likely choices; a higher value can flatten the distribution. Top-k limits the number of candidates; top-p limits the set using a probability threshold.
 
-Open Colab section **4 (Real next-token probabilities)** or **Generation and probabilities** locally. Start with `Bugün hava`. Keep top-k and top-p fixed while changing only temperature; in the second Colab call set `top_k` to 20 and `top_p` to 0.9; then restore the starting settings and change the context to `Kışın dağlarda bugün hava`. Distinguish the raw distribution from the post-sampling distribution. A local generation limit of 1 produces one new token; increase it for a longer continuation.
+Open Colab section **4 (Real next-token probabilities)** (`4A`–`4C`; then compare greedy vs. sampled generation in `5A`–`5B`). Start with `Bugün hava`. Keep top-k and top-p fixed while changing only temperature; in the second Colab call set `top_k` to 20 and `top_p` to 0.9; then restore the starting settings and change the context to `Kışın dağlarda bugün hava`. Distinguish the raw distribution from the post-sampling distribution.
 
-Colab uses full model weights, while the local demo uses a smaller GGUF version and a different runtime. Numbers and sampling details need not match exactly; account for that difference when comparing observations.
+The Colab notebook observes probability and generation steps directly with Qwen3.5-0.8B weights; runtime speed varies between GPU and CPU sessions.
 
 ## 3. Vector / Matrix / Embedding
 
@@ -52,7 +52,7 @@ A **function** is code that performs a defined task when called. An **API** is a
 
 This is one **example flow**. A model proposal does not execute code by itself; the application or harness checks permissions and inputs:
 
-```mermaid
+`�``mermaid
 flowchart TD
     A["User request"] --> B["Model proposes a tool call"]
     B --> C{"Application checks permissions and inputs"}
@@ -61,11 +61,11 @@ flowchart TD
     D --> E["Tool result returns to application"]
     E --> F["Application sends result to model"]
     F --> G["Model proposes an answer or next step"]
-```
+`�``
 
 ### Experiment C: Observe a glossary tool
 
-Run Colab section **6 (Tool calling)** or choose **Tool calling** locally. Try `What is a token? Use lookup_term first.` If the model proposes the tool and `term` argument, the harness checks that there is one allowed call with an allowed argument; the actual result from a fixed local glossary is sent back to the model. Record which stage belongs to the model and which to the application. If there is no valid proposal, no tool is run.
+Run Colab section **6 (Tool calling)** (`6A`–`6C`). Try `What is a token? Use lookup_term first.` If the model proposes the tool and `term` argument, the harness checks that there is one allowed call with an allowed argument; the actual result from a fixed dictionary is sent back to the model. Record which stage belongs to the model and which to the application. If there is no valid proposal, no tool is run.
 
 ## 5. Structured Output / Schema and JSON
 
@@ -73,12 +73,12 @@ Run Colab section **6 (Tool calling)** or choose **Tool calling** locally. Try `
 
 The object below conforms to the demo schema, but the explanation is false:
 
-```json
+`�``json
 {"term": "token", "found": true, "explanation": "A token is always a word."}
-```
+`�``
 
 Changing `found` to `"true"` still gives valid JSON, but it no longer conforms to the demo schema: the value is a string rather than a boolean. A schema alone does not establish the factual correctness of an otherwise well-typed explanation.
 
-### Experiment D: Offline schema checking
+### Experiment D: Compare schema compliance and truth
 
-Run the [mini demo](demos/structured-output/README.en.md) with a known and an unknown term; inspect `term`, `found`, and `explanation`. Its `schema_lab.py` also shows that the intentionally false example explanation passes the schema, while changing `found` to a string fails it. It **does not call an LLM or external API**. Its local validator checks only the small subset used in its demo schema; it is not a general-purpose JSON Schema validator. Practice questions are in the [exercises](exercises/README.en.md).
+Compare the [schema file](demos/structured-output/schema.json) linked from the [structured-output walkthrough](demos/structured-output/README.en.md) against the two JSON payloads above. Object A satisfies the field and type constraints on `term`, `found`, and `explanation`, yet its explanation is **intentionally false**. Object B has `"true"` as a string for `found`, so it remains valid JSON while failing the schema's `boolean` constraint. This walkthrough is conceptual and makes no LLM or external API call. Practice questions are in the [exercises](exercises/README.en.md).
