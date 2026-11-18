@@ -1,0 +1,38 @@
+# 03 — Modern Agent Stack
+
+[Home](../../README.en.md) | [Türkçe](README.md)
+
+**Duration:** Approximately 90 minutes. Before starting, recall harness validation, context budgeting, and memory boundaries from [session two](../02-agent-core-and-state/README.en.md).
+
+In this session we scale session two's single-agent harness into a modular, production-style architecture. Instead of a hard-coded flat tool list, we discover `campus_kb`, `ops_desk`, and `media_world` dynamically over `MCP` (`JSON-RPC 2.0`), separate `Plugin` capabilities from `Skill` workflows using `Progressive Disclosure`, resolve deterministic requests at `0` tokens in `deterministic_gate`, enforce `StructuredHandoff` between least-privilege specialists, and unify `System1DecisionGate` (`Jev` and open-weight `Laya` decision primitives: `Choice`/`Score`/`Noul`), `SLM`, natively multimodal `System 2` (`Gemma 4 12B QAT + MTP`), `World Model` tools, and a real filesystem/shell **`Agentic CLI`** (`uv 0.13.8` + CPython `3.14` + `mistral-vibe 3.1.2`, `E1`–`E2`) inside one cognitive and modal cascade.
+
+> **Recommended pre-read:** Spend 5 minutes skimming the 30 key terms in the [session glossary](glossary.md) before class so every live demo step is immediately familiar.
+
+## Learning goals
+
+- Separate `MCP`, `JSON-RPC 2.0`, `Plugin` (`campus_kb`, `ops_desk`, `media_world`), and `Skill` layers, and demonstrate runtime `tools/list` discovery alongside `Progressive Disclosure` context savings.
+- Decide when an LLM is unnecessary, applying `deterministic_gate` (`0` tokens) and hybrid LLM-extraction + Python-validation workflows.
+- Prevent `context loss` and privilege escalation (`admin_agent`) in multi-agent orchestration using scoped specialists, `StructuredHandoff`, and `max_handoffs=2`.
+- Distinguish `System 1` decision primitives (`Jev` and open-weight ~100M Apache-2.0 `Laya`: `Choice`/`Score`/`Noul`, `RLCD`), `SLM`s, natively multimodal `System 2` (`Gemma 4 12B + MTP`, `llama.cpp v1.0.0 b12359`, `f8_e4m3` FP8 KV, `262,144` max active context, and `1,048,576` total KV pool; `524,288` `512K` GPU-resident KV on T4), T4-compatible `media_world` / `World Model` mockup orchestration, and real `Agentic CLI` (`mistral-vibe 3.1.2`, `E1`–`E2`), and verify `escalated_to_system2=True` escalation when `noul_confidence < 0.75` or payloads are malformed.
+
+## Lesson sequence
+
+| Minutes | Topic / observation |
+| --- | --- |
+| 0-10 | Bridge from session two harness and pre-session concept map |
+| 10-26 | Tool ecosystem: `MCP`, `Plugin`, `Skill`, and Experiment A (`4F`, `A1`–`A2`) |
+| 26-40 | Deterministic gates, hybrid workflows, and Experiment B (`B1`–`B2`) |
+| 40-58 | Multi-agent orchestration, `StructuredHandoff`, boundaries, and Experiment C (`C1`–`C3`) |
+| 58-76 | System 1 vs System 2, `World Model` cascade, escalation, and Experiment D (`D1`–`D3`) + `Agentic CLI` / Web Chat (`E1`–`E5`) |
+| 76-87 | Small-group exercise and comparison of results |
+| 87-90 | Understanding check and wrap-up |
+
+## Materials
+
+[Lesson notes](lesson-notes.md) | [Session glossary](glossary.md) | [Demos](demos/README.en.md) | [Exercises](exercises/README.en.md)
+
+The live-demo path is the self-contained, syntax-highlighted, 51-cell (36 code, 15 markdown) modular [G4 Colab notebook](demos/modern-agent-stack/AgentLab-Session03-G4.ipynb). Download it from GitHub (or use your Google Drive copy), open it in Colab via **File → Upload notebook**, and select a **G4 / RTX PRO 6000 Blackwell** runtime (or A100/L4 or T4 in the plan-matched Drive notebooks). Opening cells initialize `S3LAB_DIR`, verify GPU/VRAM (`1A`–`1B`), and optionally (`USE_DRIVE_CACHE = True`) mount the person-agnostic multi-day **`MyDrive/AgentLab-Agent-Runtime`** hierarchy (`setup` shared across days + `day-03-modern-stack` per-day state) (`1C`); validate the SHA-256 pinned artifacts (`Gemma 4 12B QAT` ~`7.22 GB` + `MTP` ~`0.25 GB` + CUDA **`llama.cpp v1.0.0` `b12359`** ~`0.20 GB` + `cudart` ~`0.59 GB`, totaling ~`7.699 GiB` / `8,266,977,117` bytes with explicit `DOWNLOAD_VERIFIED_ARTIFACTS` consent or restored from `1C` Drive `setup` cache in `2A`–`2C`), launch the single loopback server (`GpuMtpRuntime`: `--temp 1.0 --top-p 0.95 --top-k 64`, `--cache-type-k f8_e4m3 --cache-type-v f8_e4m3`, `--cache-type-k-draft f8_e4m3 --cache-type-v-draft f8_e4m3`, `--spec-draft-p-min 0.75`, tier-tuned `--spec-draft-n-max` T4 `2` / L4-A100-G4 `3`, `--flash-attn on --ctx-checkpoints 8 --cache-reuse 64`, `cache_prompt=True`, `timeout=300` in `3A`–`3D`) with a **`1,048,576` (`1M+`) total KV pool** and **`262,144` (`256K`) maximum active inference context**, and build all modular stack components (`4A`–`4F`). Across hardware tiers, G4/A100 hold `1,048,576` GPU KV (`4 × 262,144`, `--kv-unified --kv-unified-per-slot 262144`) + `8 GiB` host RAM cache, while L4 and **Tesla T4** hold **`524,288` (`512K` = `2 × 262,144`)** GPU KV in VRAM + host RAM cache (`8 GiB` on L4, `3,072–6,144 MiB` on T4). In live G4 `RTX PRO 6000 Blackwell` @ `1M` GPU KV verification we measured **`21,279 / 97,887 MiB` VRAM**, **`235.35 tok/s` decode**, and **`80.11%` MTP acceptance**; in our earlier `b12359` live `Tesla T4` (`temp=0`) baseline, the GPU-resident `524,288` (`512K`) KV pool used **`14,047 MiB` VRAM (`866 MiB` free headroom)**, restoring **`cached_tokens=182`** on Turn 2 at `324.07 tok/s` prefill and **`41.69 tok/s` decode** (single-slot `262,144` remains available at `10,677 MiB` VRAM / `4,236 MiB` free headroom when extra VRAM margin is preferred). Optional cells **`E1`–`E2`** install SHA-256-verified **`uv 0.13.8`** + relocatable **CPython `3.14`** under `/tmp/agentlab-s03-py314` + **`mistral-vibe 3.1.2`** (`1.0 / 0.95 / 64` sampling in `config.toml`, or offline restore from `py314-vibe-env.tar.gz` in Drive) to run a real filesystem/shell CLI agent (live G4 run: `E1` `3.79 s` offline Drive restore and `E2` `13.82 s` / `total_cu=159.84`; earlier `temp=0.2` live T4 baseline: `43.89 s`, `614.10 tok/s` initial prefill, `41.12–47.65 tok/s` decode, `total_cu=159.84`). New cells **`E3` (`DualLayerSessionStore`)**, **`E4` (`AgentWebServer`)**, and **`E5`** persist each turn (`transcript.md` + `input_cache`/`output_tokens` split in `session_tokens.jsonl` + optional FP8 `slot0.kv.bin` with automatic `text_replay_fallback` on mismatch/failure) and launch a Python-Harness-controlled Colab Web Chat Frame (`serve_kernel_port_as_iframe`/`serve_kernel_port_as_window`, `X-AgentLab-Token`) instead of a raw terminal UI. Inside the notebook, `System1DecisionGate` and `media_world` run as lightweight **T4-compatible mockups**, leaving heavy media synthesis (`Qwen-Image`, etc.) to high-VRAM G4/local setups. Run `1A` + `4A`–`4F` for an immediate GPU-free `ScriptedModel` preview; after optional `8A`–`8B` and `8C` (`SAVE_STATE_TO_DRIVE`/`FLUSH_UNMOUNT_DRIVE` with `drive.flush_and_unmount()`), run `9A` (`S3_WEB_UI` + model stop) and `9B` (`"SONLANDIR"`) VM release separately.
+
+> **Colab Plan & GPU Access Note:** The **G4 (`RTX PRO 6000 Blackwell`)** accelerator is only available on the **Colab Ultra** plan; **Colab Pro** accounts typically receive **A100** (or L4), while **Colab Plus / Free** accounts get at most **T4 (~15 GB VRAM)**. The Google Drive workshop folder provides all three plan-matched tiers—**`AgentLab-Session03-G4.ipynb`** (Ultra/G4), **`pro_AgentLab-Session03-A100.ipynb`** (Pro A100/L4), and **`plus_AgentLab-Session03-T4.ipynb`** (Plus/Free T4 with `524,288` `512K` GPU KV, `262,144` active context, and `1M+` total KV pool); you can also run `1A` followed by `4A`–`4F` anywhere with no GPU or download required for the deterministic `ScriptedModel` preview.
+
+[Previous: Agent Architecture, Context and Memory](../02-agent-core-and-state/README.en.md)

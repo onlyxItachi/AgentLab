@@ -34,4 +34,4 @@ The live-demo path is the self-contained, syntax-highlighted, cell-by-cell modul
 
 > **Colab Plan & GPU Access Note:** The **G4 (`RTX PRO 6000 Blackwell`)** accelerator is only available on the **Colab Ultra** plan; **Colab Pro** accounts typically receive **A100** (or L4), while **Colab Plus / Free** accounts get at most **T4 (~15 GB VRAM)**. If you do not have G4 access: (1) run `1A` followed by `4A`–`4F` to try the deterministic `ScriptedModel` preview anywhere with no GPU or download required; (2) if shared by the instructor during the live workshop, use the plan-matched (`pro_...` A100 or `plus_...` T4) notebook.
 
-[Previous: LLM Fundamentals](../01-llm-fundamentals/README.en.md)
+[Previous: LLM Fundamentals](../01-llm-fundamentals/README.en.md) | [Next: Modern Agent Stack](../03-modern-agent-stack/README.en.md)

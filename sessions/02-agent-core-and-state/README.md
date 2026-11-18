@@ -34,4 +34,4 @@ Canlı demo yolu tek dosyadan oluşan, sözdizimi vurgulu ve hücre hücre modü
 
 > **Colab Plan ve GPU Erişimi Notu:** **G4 (`RTX PRO 6000 Blackwell`)** hızlandırıcısı Google Colab'da yalnızca **Ultra** planda sunulmaktadır; **Colab Pro** hesapları çoğunlukla **A100** (veya L4), **Colab Plus / Ücretsiz** hesaplar ise en fazla **T4 (~15 GB VRAM)** erişimi alır. G4 erişiminiz yoksa (1) GPU veya indirme gerektirmeden önce `1A`, ardından `4A`–`4F` hücrelerini çalıştırarak deterministik `ScriptedModel` önizlemesini her ortamda çalıştırabilirsiniz; (2) canlı etkinlikte eğitmen tarafından paylaşıldıysa plana özel (`pro_...` A100 veya `plus_...` T4) ders defterini kullanabilirsiniz.
 
-[Önceki: LLM Temelleri](../01-llm-fundamentals/README.md)
+[Önceki: LLM Temelleri](../01-llm-fundamentals/README.md) | [Sonraki: Modern Ajan Sistemleri](../03-modern-agent-stack/README.md)
