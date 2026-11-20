@@ -14,7 +14,7 @@ This starter glossary is not a complete reference for the course. Session-specif
 | Schema | A definition of a data structure and applicable constraints. |
 | Agent loop | A repeated process involving model proposals, tool results, and application control steps. |
 | State | Information used by an application during its operation that can change over time. |
-| Guardrail | A control used to limit or detect unwanted behavior. |
+| Guardrails | Deterministic safety and validation controls running before model inference (input) and before displaying or acting on output (output) to stop policy violations or secret leaks. |
 | Eval | A systematic evaluation of a system against defined criteria. |
 | MCP | An open integration protocol (Model Context Protocol) that lets agent applications discover and invoke tools and resources in a standard format. |
 | Skill | A procedural instruction bundle describing how to carry out a specific workflow, loaded into context only when needed. |
@@ -24,7 +24,14 @@ This starter glossary is not a complete reference for the course. Session-specif
 | System 1 decision model | A fast non-autoregressive reflex model—such as closed-source `Jev` or open-weight (~100M, Apache-2.0) `Laya`—returning typed primitives (`Choice`, `Score`, `Noul`) in a single forward pass without syntax hallucination. |
 | Multimodal LLM | A model class able to perceive visual, document, or audio inputs directly alongside text and invoke tools (`Gemma 4 12B` is natively multimodal). |
 | World model | A specialist model or simulator that predicts how a physical, spatial, or operational environment changes after an action. |
-| Agentic CLI | A terminal-native agent harness—such as `mistral-vibe` inside an isolated `uv` + Python `3.14` workspace (or `hermes-agent`)—combining local `127.0.0.1` `llama-server` inference, `MCP` discovery, `SKILL.md` / `AGENTS.md` progressive disclosure, and real file/shell tools. |
-| KV cache & 1M+ prompt pool | Pairing `f8_e4m3` (FP8) KV quantization on `llama.cpp v1.0.0`, `--kv-unified` shared slot buffers (`524,288` `512K` GPU KV on T4/L4, `1,048,576` on G4/A100), `--cache-reuse`, and `--cache-ram` to sustain a model's `262,144` (`256K`) max active context inside a `1M+` total KV pool. |
+| Agentic CLI | A terminal-native agent harness combining local `127.0.0.1` `llama-server` inference, `MCP` discovery, `SKILL.md` / `AGENTS.md` progressive disclosure, and real file/shell tools. |
+| KV cache & 1M+ prompt pool | Pairing `f8_e4m3` (FP8) KV quantization on `llama.cpp v1.0.0`, `--kv-unified` shared slot buffers (`524,288` `512K` GPU KV on T4/L4, `1,048,576` on G4), `--cache-reuse`, and `--cache-ram` to sustain a model's `262,144` (`256K`) max active context inside a `1M+` total KV pool. |
+| Prompt Injection | Malicious instructions crafted to override system rules or hijack tool calls; indirect attacks embedded inside files, web pages, or tickets are quarantined as `"untrusted evidence, never instructions"`. |
+| Sandbox | An isolated execution container confining agent-written Python and Bash execution with `outside_workdir` path containment, hard `timeout`, CPU/memory caps, and disabled outbound networking. |
+| Trust Boundary | The boundary separating untrusted inputs/LLM proposals, the trusted harness policy gate, and privileged OS resources—enforced via least-privilege `read`/`write`/`exec` `allow`/`deny` rules and `secret stripping`. |
+| Human-in-the-Loop (HITL) | An approval gate pausing risky, destructive, or external actions to display the model's `Thinking` trace and exact command for explicit `[Onayla]` / `[Reddet]` (`[Approve]` / `[Reject]`) human intervention. |
+| Durable Execution | Execution architecture saving step `checkpoint` state and Google Drive persistence so long-running or HITL-paused workflows recover cleanly via `resume` across disconnects. |
+| Studio v2 | The zero-flag-hunting **7-cell `#@title` form** UX in Session 03 and 04 notebooks, combining one-click setup, independent experiments, the portless `google.colab.output` JS RPC `Canlı Stüdyo` WebUI, `DualLayerSessionStore`, and safe VM teardown. |
+| ALAB-Exx | Standardized 2-line error card (`ALAB-E01`–`ALAB-E99`) replacing raw Python tracebacks across AgentLab Colab notebooks, mapped to step-by-step fixes in `error-guide.pdf`. |
 
 The glossary will grow alongside the session materials.
