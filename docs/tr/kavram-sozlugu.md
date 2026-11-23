@@ -31,7 +31,14 @@ Bu başlangıç sözlüğü, tüm eğitimin tamamlanmış bir referansı değild
 | Trust Boundary | Güvenilmeyen girdi/model çıktısı, güvenilen politika kapısı (`harness`) ve ayrıcalıklı işletim sistemi katmanı arasındaki ayrım; en az yetki (`read`/`write`/`exec` `allow`/`deny`) ve `secret stripping` ile korunur. |
 | Human-in-the-Loop (HITL) | Yüksek riskli, geri alınamaz veya dış etkili eylemlerden önce yürütmeyi duraklatıp kullanıcıya `Thinking` ve tam komutu göstererek `[Onayla]` / `[Reddet]` kararı sunan insan denetimi kapısı. |
 | Durable Execution | Ağ kopması, sekme kapanması veya HITL beklemesi gibi kesintilere rağmen adım `checkpoint` kayıtları ve Google Drive kalıcılığıyla görevi `resume` edip sürdüren yürütme mimarisi. |
-| Studio v2 | Oturum 03 ve 04 Colab defterlerindeki bayrak avlamasız **7 hücreli `#@title` form** arayüzü; tek tuş kurulum, bağımsız deneyler, portsuz `google.colab.output` JS RPC `Canlı Stüdyo`, `DualLayerSessionStore` ve güvenli kapanışı birleştirir. |
+| Studio v2 | Oturum 03–05 Colab defterlerindeki bayrak avlamasız **7 hücreli `#@title` form** arayüzü; tek tuş kurulum, bağımsız deneyler, portsuz `google.colab.output` JS RPC `Canlı Stüdyo`, `DualLayerSessionStore` ve güvenli kapanışı birleştirir. |
 | ALAB-Exx | Defterlerde karmaşık Python `Traceback` çıktıları yerine gösterilen sabit 2 satırlık tanı kutusu (`ALAB-E01`–`ALAB-E99`); her kodun adım adım çözümü `hata-cozum-rehberi.pdf` içinde yer alır. |
+| Roofline & Memory Wall | Bir işlemin hız sınırını GPU bellek bant genişliğinin mi (*memory-bound* tekil decode `GEMV`) yoksa hesaplama çekirdeklerinin mi (*compute-bound* prefill / büyük batch `GEMM`) belirlediğini gösteren başarım sınırı. |
+| Chunked Prefill & Continuous Batching | Uzun istem önişlemesini (`--ubatch-size` ile `GEMM` parçaları) kesintiye uğratmadan farklı oturumların token adımını slot bazında birleştirip `Tensor Core` doluluğunu artıran sunum mekanizması. |
+| Prefix Caching | Değişmeyen sistem istemi ve araç şeması öneklerinin KV önbellek bloklarını (`cache_prompt=True`) yeniden kullanarak `TTFT` ve `prompt_ms` gecikmesini düşürme tekniği. |
+| Speculative Decoding (MTP & DFLASH) | Küçük taslak başlığı (`MTP`) veya paralel blok difüzyonu (`DFLASH`) ile çoklu aday token önerip tek hedef model doğrulamasıyla kaliteden ödün vermeden decode hızını artırma yöntemi. |
+| Joule/Token & $/1M Token | Anlık GPU güç tüketimi ve toplam üretim hızı (`Watt / tok_s`) ile ölçülen token başına enerji ve milyon token maliyet metrikleri. |
+| Observability & Span Tracing | Sunucu `/metrics` ve `timings` sayaçlarını `llm_prefill`, `llm_decode` ve `tool_exec` aşamalarına bölerek üretim darboğazlarını izleme disiplini. |
+| Trajectory Eval & LLM-as-a-Judge | Ajanın yalnızca son yanıtını değil araç çağırma sırasını (`trajectory`) deterministik kontrollerle doğrulayıp açık uçlu kaliteyi rubrik tabanlı hakem modelle (`LLM-as-a-Judge`) puanlama yaklaşımı. |
 
 Terimlerin kapsamı ileride ilgili oturumların materyalleriyle genişletilecektir.

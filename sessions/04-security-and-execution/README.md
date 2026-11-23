@@ -53,4 +53,4 @@ Bu oturumda öğrencilerden hücre içinde `True`/`False` bayrağı avlamaları 
 
 Yazdırılabilir çalışma kitapçıkları (`oturum-04.pdf` / `session-04.pdf`) ve `ALAB-Exx` hata çözüm rehberleri (`hata-cozum-rehberi.pdf` / `error-guide.pdf`) canlı oturum Google Drive klasörü üzerinden paylaşılır.
 
-[Önceki: Modern Ajan Sistemleri](../03-modern-agent-stack/README.md) | [Ana sayfa](../../README.md)
+[Önceki: Modern Ajan Sistemleri](../03-modern-agent-stack/README.md) | [Sonraki: Altyapı, Performans, Maliyet ve Değerlendirme](../05-infrastructure-and-evals/README.md)

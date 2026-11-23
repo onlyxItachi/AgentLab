@@ -53,4 +53,4 @@ Participants never hunt for hidden `True`/`False` flags inside code cells. Each 
 
 Printable student workbooks (`oturum-04.pdf` / `session-04.pdf`) and `ALAB-Exx` error guides (`hata-cozum-rehberi.pdf` / `error-guide.pdf`) are shared in the Google Drive workshop folder.
 
-[Previous: Modern Agent Stack](../03-modern-agent-stack/README.en.md) | [Home](../../README.en.md)
+[Previous: Modern Agent Stack](../03-modern-agent-stack/README.en.md) | [Next: Infrastructure, Performance & Evals](../05-infrastructure-and-evals/README.en.md)

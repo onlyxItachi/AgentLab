@@ -1,0 +1,2259 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentLab Oturum 05 · Inference, Bellek Hiyerarşisi &amp; KV Cache Simülatörü (2026)</title>
+  <style>
+    :root {
+      --bg-0: #060a13;
+      --bg-1: #0c1322;
+      --bg-2: #121c31;
+      --bg-3: #182540;
+      --border: #233354;
+      --border-hi: #385282;
+      --text-0: #f8fafc;
+      --text-1: #cbd5e1;
+      --text-2: #8fa3c4;
+      --cyan: #38bdf8;
+      --cyan-dim: rgba(56, 189, 248, 0.14);
+      --emerald: #34d399;
+      --emerald-dim: rgba(52, 211, 153, 0.14);
+      --amber: #fbbf24;
+      --amber-dim: rgba(251, 191, 36, 0.14);
+      --rose: #fb7185;
+      --rose-dim: rgba(251, 113, 133, 0.15);
+      --violet: #a78bfa;
+      --violet-dim: rgba(167, 139, 250, 0.15);
+      --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-0);
+      color: var(--text-0);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.48;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .sim-root {
+      min-height: 680px;
+      background: radial-gradient(circle at 14% 0%, rgba(56, 189, 248, 0.08), transparent 42%),
+                  radial-gradient(circle at 86% 4%, rgba(167, 139, 250, 0.07), transparent 40%),
+                  var(--bg-0);
+      color: var(--text-0);
+      padding: 14px 18px 24px;
+      max-width: 1640px;
+      margin: 0 auto;
+    }
+
+    .num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+
+    /* Header */
+    .sim-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin-bottom: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(167, 139, 250, 0.22));
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      color: var(--cyan);
+      font-weight: 700;
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-0);
+      letter-spacing: -0.01em;
+    }
+
+    .brand p {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: var(--text-2);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border-hi);
+      background: var(--bg-2);
+      color: var(--text-0);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 13px;
+      border-radius: 9px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    .btn:hover { background: var(--bg-3); border-color: var(--cyan); }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary {
+      background: rgba(56, 189, 248, 0.18);
+      border-color: rgba(56, 189, 248, 0.55);
+      color: #e0f2fe;
+    }
+    .btn-primary:hover { background: rgba(56, 189, 248, 0.28); }
+    .btn-violet {
+      background: var(--violet-dim);
+      border-color: rgba(167, 139, 250, 0.55);
+      color: #ede9fe;
+    }
+    .btn-violet:hover { background: rgba(167, 139, 250, 0.25); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 7px; }
+    .btn.active-pill {
+      background: var(--cyan-dim);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    /* Tabs */
+    .tab-bar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .tab-btn {
+      appearance: none;
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      color: var(--text-1);
+      padding: 10px 12px;
+      border-radius: 11px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.16s ease;
+    }
+
+    .tab-btn:hover { border-color: var(--border-hi); background: var(--bg-2); }
+    .tab-btn.active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.16), rgba(18, 28, 49, 0.96));
+      border-color: var(--cyan);
+      color: var(--text-0);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25), 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: fadeIn 0.18s ease-out; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Layout & Cards */
+    .grid-2 { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; }
+    .grid-2-eq { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+
+    .card {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-0);
+      margin: 0 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .sub { font-size: 12px; color: var(--text-2); margin: 0 0 10px; }
+
+    .kpi-box {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .kpi-label { font-size: 11px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.04em; }
+    .kpi-val { font-size: 20px; font-weight: 700; color: var(--text-0); margin-top: 3px; }
+    .kpi-sub { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
+    }
+    .b-cyan { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.35); }
+    .b-emerald { background: var(--emerald-dim); color: var(--emerald); border: 1px solid rgba(52, 211, 153, 0.35); }
+    .b-amber { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.35); }
+    .b-rose { background: var(--rose-dim); color: var(--rose); border: 1px solid rgba(251, 113, 133, 0.35); }
+    .b-violet { background: var(--violet-dim); color: var(--violet); border: 1px solid rgba(167, 139, 250, 0.35); }
+
+    /* Controls */
+    .control-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 4px; min-width: 170px; flex: 1; }
+    .field label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    select, input[type="range"] {
+      accent-color: var(--cyan);
+    }
+
+    select {
+      background: var(--bg-0);
+      color: var(--text-0);
+      border: 1px solid var(--border-hi);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 13px;
+      font-family: var(--font-sans);
+      cursor: pointer;
+    }
+
+    input[type="range"] { width: 100%; cursor: pointer; }
+
+    /* Progress & Gauges */
+    .meter-track {
+      height: 12px;
+      background: var(--bg-0);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.25s ease, background 0.25s ease;
+    }
+
+    .side-note {
+      background: rgba(167, 139, 250, 0.08);
+      border: 1px solid rgba(167, 139, 250, 0.32);
+      border-left: 4px solid var(--violet);
+      border-radius: 10px;
+      padding: 11px 13px;
+      font-size: 12.5px;
+      color: var(--text-1);
+    }
+
+    .warn-note {
+      background: var(--rose-dim);
+      border: 1px solid rgba(251, 113, 133, 0.45);
+      border-left: 4px solid var(--rose);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      color: #ffe4e6;
+    }
+
+    /* Tab 2 Stage */
+    .stage-steps {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .stage-step {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 10px;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .stage-step.active {
+      border-color: var(--cyan);
+      background: rgba(56, 189, 248, 0.13);
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.16);
+    }
+    .stage-step .st-idx { font-size: 10px; color: var(--text-2); font-weight: 700; text-transform: uppercase; }
+    .stage-step .st-name { font-size: 12.5px; font-weight: 700; color: var(--text-0); margin-top: 2px; }
+    .stage-step .st-dim { font-size: 11px; color: var(--cyan); font-family: var(--font-mono); margin-top: 2px; }
+
+    .kv-shelves {
+      display: grid;
+      grid-template-columns: repeat(16, minmax(0, 1fr));
+      gap: 4px;
+      padding: 8px;
+      background: var(--bg-0);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .kv-cell {
+      height: 18px;
+      border-radius: 3px;
+      background: var(--bg-2);
+      border: 1px solid #1d2b48;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .kv-cell.filled { background: rgba(56, 189, 248, 0.55); border-color: var(--cyan); }
+    .kv-cell.active-chunk { background: var(--emerald); border-color: #a7f3d0; box-shadow: 0 0 8px rgba(52, 211, 153, 0.55); }
+    .kv-cell.decode-tok { background: var(--amber); border-color: #fde68a; }
+
+    .batch-lanes {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 4px;
+      margin-top: 8px;
+    }
+    .user-lane {
+      background: var(--bg-0);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      text-align: center;
+      color: var(--text-2);
+    }
+    .user-lane.on {
+      background: rgba(52, 211, 153, 0.14);
+      border-color: var(--emerald);
+      color: var(--emerald);
+      font-weight: 700;
+    }
+
+    /* Tab 3 KV bars & Case Study */
+    .kv-row {
+      display: grid;
+      grid-template-columns: 270px 1fr 125px;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      margin-bottom: 7px;
+    }
+    .kv-bar-wrap {
+      height: 18px;
+      background: var(--bg-0);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    .kv-bar-fill { height: 100%; border-radius: 5px; transition: width 0.28s ease; }
+
+    .toggle-card {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .toggle-card.broken { border-color: rgba(251, 113, 133, 0.5); background: rgba(251, 113, 133, 0.08); }
+    .toggle-card.fixed { border-color: rgba(52, 211, 153, 0.5); background: rgba(52, 211, 153, 0.08); }
+
+    .token-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 8px;
+      background: var(--bg-0);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .tok-pill {
+      padding: 2px 6px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      color: var(--text-1);
+    }
+    .tok-pill.hit { background: var(--emerald-dim); border-color: var(--emerald); color: var(--emerald); }
+    .tok-pill.miss { background: var(--rose-dim); border-color: var(--rose); color: var(--rose); }
+    .tok-pill.shift { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+
+    /* Tab 4 Race & Pareto */
+    .race-lane {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 11px 13px;
+      margin-bottom: 10px;
+    }
+    .race-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .race-track {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow: hidden;
+      gap: 3px;
+      padding: 6px;
+      background: var(--bg-0);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      min-height: 36px;
+      align-items: center;
+    }
+    .r-tok {
+      min-width: 19px;
+      height: 22px;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .r-base { background: rgba(56, 189, 248, 0.22); border: 1px solid var(--cyan); color: #e0f2fe; }
+    .r-acc { background: rgba(52, 211, 153, 0.25); border: 1px solid var(--emerald); color: #d1fae5; }
+    .r-rej { background: rgba(251, 113, 133, 0.25); border: 1px solid var(--rose); color: #ffe4e6; text-decoration: line-through; }
+    .r-bonus { background: rgba(251, 191, 36, 0.25); border: 1px solid var(--amber); color: #fef3c7; }
+    .r-dflash { background: rgba(167, 139, 250, 0.28); border: 1px solid var(--violet); color: #ede9fe; }
+
+    .arch-card {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 11px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, transform 0.12s;
+    }
+    .arch-card:hover { border-color: var(--border-hi); transform: translateY(-1px); }
+    .arch-card.selected { border-color: var(--cyan); background: rgba(56, 189, 248, 0.1); }
+
+    /* Slide-out Drawer */
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 6, 14, 0.72);
+      z-index: 9998;
+      display: none;
+      backdrop-filter: blur(2px);
+    }
+    .drawer-backdrop.open { display: block; }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(640px, 95vw);
+      height: 100vh;
+      background: var(--bg-1);
+      border-left: 1px solid var(--border-hi);
+      z-index: 9999;
+      transform: translateX(102%);
+      transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+      display: flex;
+      flex-direction: column;
+      box-shadow: -12px 0 40px rgba(0, 0, 0, 0.65);
+    }
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-head {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: var(--bg-2);
+    }
+
+    .drawer-body {
+      padding: 16px 18px 28px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .spec-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      margin-bottom: 14px;
+    }
+    .spec-table th, .spec-table td {
+      border-bottom: 1px solid var(--border);
+      padding: 6px 8px;
+      text-align: left;
+    }
+    .spec-table th { color: var(--text-2); font-weight: 600; width: 42%; }
+    .spec-table td { font-family: var(--font-mono); color: var(--text-0); }
+
+    pre.code-block {
+      margin: 0;
+      background: #050811;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: 11.8px;
+      line-height: 1.48;
+      color: #dbeafe;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .sim-root.expanded-view {
+      position: fixed;
+      inset: 0;
+      max-width: none;
+      z-index: 9990;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 1100px) {
+      .grid-2, .grid-2-eq { grid-template-columns: 1fr; }
+      .tab-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stage-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .kv-row { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .tab-bar { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="agentlab-sim-root" class="sim-root">
+  <!-- HEADER -->
+  <header class="sim-header">
+    <div class="brand">
+      <span class="brand-badge">AGENTLAB · OTURUM 05</span>
+      <div>
+        <h1>LLM Inference, Bellek Hiyerarşisi &amp; KV Cache Simülatörü (Kasım 2026)</h1>
+        <p>Memory Wall · Roofline · Chunked Prefill vs GEMV Decode · Continuous Batching · Prefix Cache · MTP &amp; DFLASH</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button type="button" id="btn-drawer-open" class="btn btn-violet">🔬 Matematik &amp; PyTorch</button>
+      <button type="button" id="btn-fullscreen" class="btn">⛶ Tam Ekran</button>
+    </div>
+  </header>
+
+  <!-- 4 MAIN TABS -->
+  <nav class="tab-bar" role="tablist" aria-label="Simülatör Sekmeleri">
+    <button type="button" class="tab-btn active" data-tab="tab1" role="tab" aria-selected="true">🏗️ GPU Bellek Hiyerarşisi &amp; Cerebras WSE</button>
+    <button type="button" class="tab-btn" data-tab="tab2" role="tab" aria-selected="false">⚡ Chunked Prefill (ubatch) vs Decode (GEMV) vs Batching</button>
+    <button type="button" class="tab-btn" data-tab="tab3" role="tab" aria-selected="false">🗄️ KV Cache, Prefix Caching &amp; Mimari Sıkıştırma</button>
+    <button type="button" class="tab-btn" data-tab="tab4" role="tab" aria-selected="false">🚀 Saf Decode vs MTP vs DFLASH &amp; 2026 Mimariler</button>
+  </nav>
+
+  <!-- ==================== TAB 1 ==================== -->
+  <section id="tab1" class="tab-panel active">
+    <div class="control-bar">
+      <div class="field" style="flex:1.4;">
+        <label for="t1-hw"><span>Donanım Platformu (Kasım 2026 Doğrulanmış Profil)</span></label>
+        <select id="t1-hw"></select>
+      </div>
+      <div class="field" style="flex:1.1;">
+        <label for="t1-model"><span>Aktif Model Ayak İzi (Ağırlık)</span></label>
+        <select id="t1-model"></select>
+      </div>
+      <div class="field" style="flex:0.7; min-width:150px;">
+        <label><span>Paket Animasyonu</span></label>
+        <button type="button" id="t1-anim-toggle" class="btn btn-primary btn-sm">⏸ Akışı Duraklat</button>
+      </div>
+    </div>
+
+    <div class="grid-4" style="margin-bottom:14px;">
+      <div class="kpi-box">
+        <div class="kpi-label">Bellek Kapasitesi &amp; Tipi</div>
+        <div class="kpi-val num" id="t1-kpi-mem">—</div>
+        <div class="kpi-sub" id="t1-kpi-fit">—</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Bellek Bant Genişliği (BW)</div>
+        <div class="kpi-val num" id="t1-kpi-bw" style="color:var(--cyan);">—</div>
+        <div class="kpi-sub" id="t1-kpi-stack">—</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Teorik Decode Tavanı (B=1)</div>
+        <div class="kpi-val num" id="t1-kpi-theo" style="color:var(--amber);">—</div>
+        <div class="kpi-sub" id="t1-kpi-formula">BW / Aktif Ağırlık</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-label">Pratik Decode (~%70 Verim)</div>
+        <div class="kpi-val num" id="t1-kpi-prac" style="color:var(--emerald);">—</div>
+        <div class="kpi-sub" id="t1-kpi-prac-sub">Çekirdek + KV okuma ek yükü dahil</div>
+      </div>
+    </div>
+
+    <div id="t1-vram-warn" class="warn-note" style="display:none; margin-bottom:14px;"></div>
+
+    <div class="grid-2">
+      <!-- Animated Memory Pipeline -->
+      <div class="card">
+        <div class="card-title">
+          <span>Canlı Veri Yolu: HBM/VRAM → L2 Cache → On-Chip SRAM → Tensor Cores</span>
+          <span id="t1-pipe-badge" class="badge b-rose">Memory-Bound</span>
+        </div>
+        <p class="sub" id="t1-pipe-desc">Tek kullanıcı decode (batch=1) her token için tüm model ağırlıklarını dış bellekten çekirdeğe taşımak zorundadır.</p>
+        <svg id="t1-pipeline-svg" viewBox="0 0 760 270" width="100%" style="background:#070b14; border:1px solid var(--border); border-radius:10px; display:block;"></svg>
+
+        <div style="margin-top:12px;">
+          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+            <span><strong>HBM / RAM Yolu Doygunluğu</strong> vs <strong>Tensor Core Kullanımı (B=1 Decode)</strong></span>
+            <span class="num" id="t1-sat-text">—</span>
+          </div>
+          <div class="grid-2-eq" style="gap:10px;">
+            <div>
+              <div style="font-size:11px; color:var(--text-2); margin-bottom:3px;">Bellek Yolu (Bandwidth Saturation)</div>
+              <div class="meter-track"><div id="t1-bw-meter" class="meter-fill" style="width:95%; background:var(--rose);"></div></div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:var(--text-2); margin-bottom:3px;">Hesaplama Birimi (Tensor Core Util.)</div>
+              <div class="meter-track"><div id="t1-tc-meter" class="meter-fill" style="width:3%; background:var(--emerald);"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Roofline Gauge & Cerebras Note -->
+      <div class="card">
+        <div class="card-title">
+          <span>Canlı Roofline Modeli (Log-Log Arithmetic Intensity)</span>
+          <span id="t1-ridge-badge" class="badge b-cyan">Ridge: —</span>
+        </div>
+        <svg id="t1-roofline-svg" viewBox="0 0 540 240" width="100%" style="background:#070b14; border:1px solid var(--border); border-radius:10px; display:block;"></svg>
+
+        <div class="side-note" style="margin-top:12px;">
+          <strong>🧠 Cerebras WSE-3 / WSE-3T (<code>CS-4</code>) Mühendislik Ödünleşimi:</strong>
+          Tek 300 mm wafer üzerinde <code>44 GB</code> <strong>on-chip SRAM</strong> (<code>21 PB/s</code> WSE-3 · <code>43,2 PB/s</code> WSE-3T / CS-4) bulundurduğu için <code>7,2–17,7 GB</code> modeller HBM duvarına hiç çarpmaz; OpenAI <code>GPT-5.6 Sol Ultrafast</code> modu damıtmasız (zero-distillation) <strong><code>~750 tok/s</code> (~14× hızlanma)</strong> üretir. <em>Ancak</em> aynı güç/maliyet bütçesindeki GPU/TPU kümelerine göre yoğun matris (<code>dense compute FLOPS/$</code>) yoğunluğu düşüktür; bu yüzden dev ön-eğitimde GPU/TPU, düşük gecikmeli ajan decode'unda Cerebras öne çıkar. <span style="color:var(--text-2);">(Not: Kasım 2026 itibarıyla resmi <code>WSE-4</code> henüz çıkmadı; sahadaki amiral <code>CS-4</code> içindeki <code>WSE-3T</code>'dir.)</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 2 ==================== -->
+  <section id="tab2" class="tab-panel">
+    <div class="control-bar">
+      <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+        <button type="button" id="t2-play" class="btn btn-primary">▶ Oynat</button>
+        <button type="button" id="t2-pause" class="btn">⏸ Duraklat</button>
+        <button type="button" id="t2-step" class="btn">⏭ Adım</button>
+        <button type="button" id="t2-reset" class="btn">↺ Sıfırla</button>
+      </div>
+      <div class="field">
+        <label for="t2-gpu"><span>Referans GPU (Saatlik Maliyet &amp; Güç)</span></label>
+        <select id="t2-gpu">
+          <option value="t4">Tesla T4 · 320 GB/s · $0,35/sa · 70W</option>
+          <option value="g4" selected>RTX PRO 6000 (G4) · 1.792 GB/s · $1,40/sa · 285W</option>
+          <option value="h100">H100 SXM · 3.350 GB/s · $2,50/sa · 650W</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="t2-ubatch"><span>--ubatch-size (B)</span><span class="num" id="t2-ubatch-val">256</span></label>
+        <input type="range" id="t2-ubatch" min="64" max="512" step="64" value="256" />
+      </div>
+      <div class="field">
+        <label for="t2-prompt-len"><span>Prompt Uzunluğu (T)</span><span class="num" id="t2-prompt-val">2048 tok</span></label>
+        <input type="range" id="t2-prompt-len" min="256" max="8192" step="256" value="2048" />
+      </div>
+      <div class="field">
+        <label for="t2-users"><span>Concurrent Users (N)</span><span class="num" id="t2-users-val">1</span></label>
+        <input type="range" id="t2-users" min="1" max="64" step="1" value="1" />
+      </div>
+    </div>
+
+    <!-- 5 Step Cards -->
+    <div class="stage-steps" id="t2-steps">
+      <div class="stage-step active" data-step="0">
+        <div class="st-idx">Adım 1</div>
+        <div class="st-name">Tokenization</div>
+        <div class="st-dim">Metin → ID dizisi</div>
+      </div>
+      <div class="stage-step" data-step="1">
+        <div class="st-idx">Adım 2</div>
+        <div class="st-name">Embedding Lookup</div>
+        <div class="st-dim">E[ids] → [T × 3840]</div>
+      </div>
+      <div class="stage-step" data-step="2">
+        <div class="st-idx">Adım 3</div>
+        <div class="st-name">Chunked Prefill</div>
+        <div class="st-dim" id="t2-step-prefill-dim">[256 × 3840] × W GEMM</div>
+      </div>
+      <div class="stage-step" data-step="3">
+        <div class="st-idx">Adım 4</div>
+        <div class="st-name">Saf Decode (B=1)</div>
+        <div class="st-dim">[1 × 3840] × W GEMV</div>
+      </div>
+      <div class="stage-step" data-step="4">
+        <div class="st-idx">Adım 5</div>
+        <div class="st-name">Continuous Batching</div>
+        <div class="st-dim" id="t2-step-batch-dim">[1 × 3840] × W</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Visual Stage Canvas -->
+      <div class="card">
+        <div class="card-title">
+          <span id="t2-stage-title">Aşama 1: Tokenization &amp; Girdi Hazırlığı</span>
+          <span id="t2-op-badge" class="badge b-cyan">Hazır</span>
+        </div>
+        <p class="sub" id="t2-stage-desc">Ham istem tokenizer tarafından parçalara ayrılır; Gemma 4 kelime dağarcığı V=262.144 boyutundadır.</p>
+
+        <div id="t2-matrix-viz" style="background:var(--bg-0); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+            <span style="font-size:12px; color:var(--text-2);">Aktif Matris Çarpımı:</span>
+            <span class="num" id="t2-matrix-eq" style="font-size:14px; font-weight:700; color:var(--cyan);">[T × 3840] lookup</span>
+          </div>
+          <svg id="t2-svg" viewBox="0 0 680 150" width="100%" style="display:block;"></svg>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+            <span><strong>KV Cache Rafları (Prefill Chunk Dolumu + Decode Eklemesi)</strong></span>
+            <span class="num" id="t2-kv-progress">0 / 8 Chunk</span>
+          </div>
+          <div class="kv-shelves" id="t2-kv-shelves"></div>
+        </div>
+
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:12px;">
+            <span><strong>Eşzamanlı Kullanıcı Şeritleri (Continuous Batching Slotları)</strong></span>
+            <span class="num" id="t2-lane-summary">1 / 64 aktif</span>
+          </div>
+          <div class="batch-lanes" id="t2-batch-lanes"></div>
+        </div>
+      </div>
+
+      <!-- Gauges + Economics & Energy -->
+      <div class="card">
+        <div class="card-title">
+          <span>Donanım Doygunluğu, Maliyet ($/1M Token) &amp; Enerji (Joule/Token)</span>
+          <span class="badge b-amber">AI Factory Sayacı</span>
+        </div>
+
+        <div class="grid-2-eq" style="margin-bottom:12px;">
+          <div class="kpi-box">
+            <div class="kpi-label">Tensor Core Doygunluğu</div>
+            <div class="kpi-val num" id="t2-tc-val" style="color:var(--emerald);">—</div>
+            <div class="meter-track" style="margin-top:6px;"><div id="t2-tc-bar" class="meter-fill" style="width:10%; background:var(--emerald);"></div></div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">HBM Bant Genişliği Baskısı</div>
+            <div class="kpi-val num" id="t2-hbm-val" style="color:var(--rose);">—</div>
+            <div class="meter-track" style="margin-top:6px;"><div id="t2-hbm-bar" class="meter-fill" style="width:90%; background:var(--rose);"></div></div>
+          </div>
+        </div>
+
+        <div class="grid-3" style="margin-bottom:12px;">
+          <div class="kpi-box">
+            <div class="kpi-label">Sistem Throughput</div>
+            <div class="kpi-val num" id="t2-tps" style="color:var(--cyan);">—</div>
+            <div class="kpi-sub" id="t2-per-user-tps">Kullanıcı başı: —</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Maliyet ($ / 1M Token)</div>
+            <div class="kpi-val num" id="t2-cost" style="color:var(--amber);">—</div>
+            <div class="kpi-sub">Saatlik kira / toplam üretim</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Enerji (Joule / Token)</div>
+            <div class="kpi-val num" id="t2-joule" style="color:var(--emerald);">—</div>
+            <div class="kpi-sub" id="t2-watt">Anlık güç: — W</div>
+          </div>
+        </div>
+
+        <div class="side-note" style="margin-bottom:10px;">
+          <strong>📐 AI Factory İki Temel Denklemi (Oturum 05):</strong><br/>
+          <code style="color:var(--amber);">Maliyet ($/1M tok) = (GPU $/sa ÷ (Throughput × 3600)) × 1.000.000</code><br/>
+          <code style="color:var(--emerald);">Enerji (Joule/tok) = Anlık Güç (Watt) ÷ Throughput (tok/s)</code><br/>
+          <span style="color:var(--text-2);"><code>N</code> arttıkça model ağırlığı <code>W</code> HBM'den adım başına <strong>yalnızca 1 kez</strong> okunur ve <code>N</code> kullanıcıya bölüştürülür; böylece <code>[1×3840]</code> GEMV, <code>[N×3840]</code> GEMM'e dönüşür.</span>
+        </div>
+
+        <div class="kpi-box" style="font-size:12px; color:var(--text-1);">
+          <strong>📊 Canlı AgentLab Ölçüm Referansları:</strong><br/>
+          • <strong>Oturum 03 T4 Tekil Akış (B=1):</strong> <code>16,74 tok/s</code> @ <code>38,99 W</code> → <strong><code>~2,33 J/token</code></strong><br/>
+          • <strong>Oturum 02 G4 vLLM 8-Oturum + MTP5:</strong> <code>619,2 tok/s</code> @ <code>~285 W</code> → <strong><code>~0,46 J/token</code></strong> (~5× daha çevreci!)
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 3 ==================== -->
+  <section id="tab3" class="tab-panel">
+    <div class="control-bar">
+      <div class="field" style="flex:1.4;">
+        <label><span>Bağlam Uzunluğu (Context Length)</span></label>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;" id="t3-ctx-pills">
+          <button type="button" class="btn btn-sm" data-ctx="8192">8K</button>
+          <button type="button" class="btn btn-sm" data-ctx="32768">32K</button>
+          <button type="button" class="btn btn-sm" data-ctx="131072">128K</button>
+          <button type="button" class="btn btn-sm" data-ctx="262144">256K</button>
+          <button type="button" class="btn btn-sm active-pill" data-ctx="1048576">1M (1.048.576)</button>
+        </div>
+      </div>
+      <div class="field" style="flex:0.9;">
+        <label><span>Eşzamanlı Oturum (Slots)</span></label>
+        <div style="display:flex; gap:6px;" id="t3-slot-pills">
+          <button type="button" class="btn btn-sm active-pill" data-slots="1">1 Slot</button>
+          <button type="button" class="btn btn-sm" data-slots="2">2 Slot</button>
+          <button type="button" class="btn btn-sm" data-slots="4">4 Slot</button>
+          <button type="button" class="btn btn-sm" data-slots="8">8 Slot</button>
+        </div>
+      </div>
+      <div class="field" style="flex:0.9;">
+        <label><span>Cold vs Warm Prefix Demo</span></label>
+        <button type="button" id="t3-prefix-toggle" class="btn btn-primary btn-sm">🔥 Warm Prefix Cache (cache_prompt=True)</button>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:14px;">
+      <!-- KV Cache Memory Calculator -->
+      <div class="card">
+        <div class="card-title">
+          <span>Canlı KV Cache Bellek Hesaplayıcısı</span>
+          <span class="badge b-cyan" id="t3-ctx-badge">1M Bağlam · 1 Slot</span>
+        </div>
+        <p class="sub">Aynı bağlam penceresinde mimari tasarım (SWA, K=V MQA, Gated DeltaNet, Latent/CED+CSA2) belleği 860×'a kadar küçültür.</p>
+        <div id="t3-kv-list"></div>
+        <div style="margin-top:10px; font-size:12px; color:var(--text-2);" id="t3-gpu-fit-summary"></div>
+      </div>
+
+      <!-- Cold vs Warm Prefix Cache Timeline -->
+      <div class="card">
+        <div class="card-title">
+          <span>Cold Prefill vs Warm Prefix Cache Zaman Çizelgesi</span>
+          <span id="t3-prefix-badge" class="badge b-emerald">Warm Hit · 2.380 Cached</span>
+        </div>
+        <p class="sub" id="t3-prefix-desc">Sistem istemi + MCP araç şemaları + geçmiş tur KV blokları yeniden hesaplanmaz; yalnızca yeni 30 token prefill edilir.</p>
+
+        <div class="grid-2-eq" style="margin-bottom:10px;">
+          <div class="kpi-box">
+            <div class="kpi-label">Cold Prefill (cache_prompt=False)</div>
+            <div class="kpi-val num" style="color:var(--rose);" id="t3-cold-ttft">~7.440 ms</div>
+            <div class="kpi-sub">2.410 token sıfırdan GEMM</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Warm Prefix (cache_prompt=True)</div>
+            <div class="kpi-val num" style="color:var(--emerald);" id="t3-warm-ttft">~95 ms</div>
+            <div class="kpi-sub">2.380 cached + 30 yeni (~78× hızlı!)</div>
+          </div>
+        </div>
+
+        <svg id="t3-timeline-svg" viewBox="0 0 560 175" width="100%" style="background:#070b14; border:1px solid var(--border); border-radius:10px; display:block;"></svg>
+      </div>
+    </div>
+
+    <!-- Real AgentLab Session 03 L4 3-Way Cache Miss Case Study -->
+    <div class="card">
+      <div class="card-title">
+        <span>🔍 Canlı Vaka Analizi (18 Kasım 2026 — AgentLab Oturum 03 L4): "Neden 3 Yönlü Cache Miss Aldık?"</span>
+        <span id="t3-case-badge" class="badge b-rose">Cached: 0 | New: 2410 · n_saved: 0</span>
+      </div>
+      <p class="sub">Aşağıdaki 3 üretim mekanizmasına tıklayarak hatayı (kırmızı) düzeltmeye (yeşil) çevirin ve <code>Cached / New</code> ile <code>kv_save.n_saved</code> davranışını canlı gözlemleyin:</p>
+
+      <div class="grid-3" style="margin-bottom:12px;">
+        <div class="toggle-card broken" id="case-fix-1" role="button" tabindex="0">
+          <div style="font-size:18px;" id="case-icon-1">❌</div>
+          <div>
+            <div style="font-weight:700; font-size:13px;">1. Şablon Kayması (<code>enable_thinking=False</code>)</div>
+            <div style="font-size:12px; color:var(--text-1); margin-top:3px;" id="case-desc-1">Tur 1'de <code>&lt;|channel&gt;thought\n&lt;channel|&gt;</code> eklenir; Tur 2 geçmişinde silinince yanıt <strong>3 token sola kayar</strong> ve eşleşme ~30. tokenda kopar.</div>
+          </div>
+        </div>
+        <div class="toggle-card broken" id="case-fix-2" role="button" tabindex="0">
+          <div style="font-size:18px;" id="case-icon-2">❌</div>
+          <div>
+            <div style="font-weight:700; font-size:13px;">2. Hibrit <code>SWA = 1024</code> Duvarı</div>
+            <div style="font-size:12px; color:var(--text-1); margin-top:3px;" id="case-desc-2">2.410 token &gt; 1.024 olunca baştaki SWA durumları pencereden düşer; <code>--cache-reuse</code> kapanır ve sunucu <code>n_past = 0</code> tam yeniden hesaba düşer.</div>
+          </div>
+        </div>
+        <div class="toggle-card broken" id="case-fix-3" role="button" tabindex="0">
+          <div style="font-size:18px;" id="case-icon-3">❌</div>
+          <div>
+            <div style="font-weight:700; font-size:13px;">3. Paralel Slot (<code>--parallel 2</code> LRU)</div>
+            <div style="font-size:12px; color:var(--text-1); margin-top:3px;" id="case-desc-3">Benzerlik <code>30/2410 = %1,2 &lt; %10</code> (<code>slot_prompt_similarity=0.1</code>) kalınca istek boş <code>Slot 1</code>'e gider; <code>/slots/0?action=save</code> ise <code>n_saved=0</code> döner!</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2-eq">
+        <div>
+          <div style="font-size:11.5px; color:var(--text-2); margin-bottom:4px;"><strong>Prefix Token Eşleşmesi (Tur 1 vs Tur 2):</strong></div>
+          <div class="token-strip" id="t3-case-tokens"></div>
+        </div>
+        <div class="kpi-box" style="font-size:12px; color:var(--text-1);">
+          <strong>✅ Karşılaştırma — Kısa İstemlerde Neden Cache Hit Geldi?</strong><br/>
+          • <strong>Harness + MCP:</strong> Sabit <code>356</code> tok sistem istemi + <code>17</code> yeni = <code>356/373 = %95,4 &gt; %10</code> ve <code>&lt; 1024 SWA</code> → <code>Cached: 356 | New: 17</code><br/>
+          • <strong>E5 Otomatik Test:</strong> <code>63/68 = %92,6 &gt; %10</code> ve <code>&lt; 1024 SWA</code> → <code>Cached: 63 | New: 5</code><br/>
+          <span style="color:var(--emerald);"><strong>Gün 4–5 Kuralı:</strong> <code>enable_thinking=True</code> + <code>preserve_thinking=True</code>, tekil oturumda <code>id_slot: 0</code>, <code>--swa-full</code> / <code>--ctx-checkpoints 8</code>.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 4 ==================== -->
+  <section id="tab4" class="tab-panel">
+    <div class="control-bar">
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button type="button" id="t4-play" class="btn btn-primary">▶ Yarışı Başlat</button>
+        <button type="button" id="t4-pause" class="btn">⏸ Duraklat</button>
+        <button type="button" id="t4-reset" class="btn">↺ Sıfırla</button>
+      </div>
+      <div class="field">
+        <label for="t4-alpha"><span>Kabul Oranı (Acceptance Rate <span style="text-transform:none;">α</span>)</span><span class="num" id="t4-alpha-val">0.80 (%80)</span></label>
+        <input type="range" id="t4-alpha" min="0.40" max="0.95" step="0.01" value="0.80" />
+      </div>
+      <div class="field">
+        <label for="t4-mtp-mode"><span>MTP Çalışma Rejimi</span></label>
+        <select id="t4-mtp-mode">
+          <option value="single">Tek Kullanıcı (batch=1 · T4/L4/G4)</option>
+          <option value="batch">Continuous Batching (batch=8 · G4 vLLM = 619,2 tok/s)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="t4-dflash-block"><span>DFLASH Blok Boyutu (B_d)</span></label>
+        <select id="t4-dflash-block">
+          <option value="8">8 Token (1 Paralel Draft → 1 Mini-GEMM Verify)</option>
+          <option value="16" selected>16 Token (1 Paralel Draft → 1 Mini-GEMM Verify)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 3-Lane Speculative Decoding Race -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-title">
+        <span>3 Şeritli Çıkarım Yarışı: Saf Decode vs MTP vs DFLASH (Kayıpsız Doğrulama)</span>
+        <span class="badge b-emerald" id="t4-race-summary">Adım: 0 · Yeşil=Kabul, Kırmızı=Rollback</span>
+      </div>
+
+      <!-- Lane 1: Baseline -->
+      <div class="race-lane">
+        <div class="race-head">
+          <div>
+            <strong>1. Saf Autoregressive Decode</strong>
+            <span class="badge b-cyan" style="margin-left:6px;">1 token / adım</span>
+            <span style="font-size:12px; color:var(--text-2); margin-left:8px;">Her token için tüm ağırlık HBM'den okunur</span>
+          </div>
+          <div class="num" style="font-size:13px;">Üretilen: <strong id="t4-l1-cnt" style="color:var(--cyan);">0</strong> tok · Hız: <strong id="t4-l1-tps">44 tok/s (1,00×)</strong></div>
+        </div>
+        <div class="race-track" id="t4-l1-track"></div>
+      </div>
+
+      <!-- Lane 2: MTP -->
+      <div class="race-lane">
+        <div class="race-head">
+          <div>
+            <strong>2. MTP (<code>gemma-4-12B-it-assistant</code> · 4L · 253 MB)</strong>
+            <span class="badge b-amber" style="margin-left:6px;" id="t4-mtp-badge">Sıralı 5 Draft → 1 Mini-GEMM Verify</span>
+            <span style="font-size:12px; color:var(--text-2); margin-left:8px;" id="t4-mtp-note">Hem tek kullanıcıda hem multi-user Continuous Batching'de çalışır!</span>
+          </div>
+          <div class="num" style="font-size:13px;">Üretilen: <strong id="t4-l2-cnt" style="color:var(--amber);">0</strong> tok · Hız: <strong id="t4-l2-tps">—</strong></div>
+        </div>
+        <div class="race-track" id="t4-l2-track"></div>
+      </div>
+
+      <!-- Lane 3: DFLASH -->
+      <div class="race-lane" style="margin-bottom:0;">
+        <div class="race-head">
+          <div>
+            <strong>3. DFLASH (Block Diffusion Speculative)</strong>
+            <span class="badge b-violet" style="margin-left:6px;" id="t4-dflash-badge">1 Paralel Forward (16 tok) → 1 Mini-GEMM Verify</span>
+            <span style="font-size:12px; color:var(--text-2); margin-left:8px;">Draft aşaması O(γ) sıralı değil, O(1) paralel blok difüzyonudur</span>
+          </div>
+          <div class="num" style="font-size:13px;">Üretilen: <strong id="t4-l3-cnt" style="color:var(--violet);">0</strong> tok · Hız: <strong id="t4-l3-tps">—</strong></div>
+        </div>
+        <div class="race-track" id="t4-l3-track"></div>
+      </div>
+    </div>
+
+    <!-- 2026 Frontier Architectures & Evals Pareto -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">
+          <span>2026 Öncü Mimariler &amp; Evals Pareto Haritası</span>
+          <span class="badge b-cyan">Kalite vs Etkin Verim</span>
+        </div>
+        <svg id="t4-pareto-svg" viewBox="0 0 560 250" width="100%" style="background:#070b14; border:1px solid var(--border); border-radius:10px; display:block;"></svg>
+        <div id="t4-arch-detail" class="side-note" style="margin-top:10px;">Bir mimari kartına tıklayarak hangi darboğazı ve eval boyutunu optimize ettiğini inceleyin.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>2026 Model Aileleri (Kart Seçin)</span>
+          <span class="badge b-violet">6 Mimari Profil</span>
+        </div>
+        <div class="grid-2-eq" id="t4-arch-cards"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== SLIDE-OUT DRAWER ==================== -->
+  <div id="drawer-backdrop" class="drawer-backdrop"></div>
+  <aside id="math-drawer" class="drawer" aria-hidden="true" aria-label="Matematik ve PyTorch Referansı">
+    <div class="drawer-head">
+      <div>
+        <strong style="font-size:15px;">🔬 Gemma 4 12B Matematik &amp; PyTorch Referansı</strong>
+        <div style="font-size:11.5px; color:var(--text-2);"><code>google/gemma-4-12B-it/config.json</code> kesin boyutları</div>
+      </div>
+      <button type="button" id="btn-drawer-close" class="btn btn-sm">✕ Kapat</button>
+    </div>
+    <div class="drawer-body">
+      <table class="spec-table">
+        <tbody>
+          <tr><th>vocab_size (V)</th><td>262.144</td></tr>
+          <tr><th>hidden_size (d)</th><td>3.840</td></tr>
+          <tr><th>num_hidden_layers (L)</th><td>48 katman [40 Sliding + 8 Global]</td></tr>
+          <tr><th>40× Sliding Attention</th><td>16Q / 8KV · d_head = 256 · window = 1.024</td></tr>
+          <tr><th>8× Global Attention</th><td>16Q / 1KV (MQA) · d_head = 512 · K = V</td></tr>
+          <tr><th>MLP (GeGLU)</th><td>intermediate_size (d_ff) = 15.360</td></tr>
+          <tr><th>Çıkış Katmanı &amp; Softcap</th><td>tied E^T · final_logit_softcap = 30.0</td></tr>
+          <tr><th>KV Maliyeti (Global)</th><td>8 × 512 × 1(K=V) → 8 KB/tok (FP16) · 4 KB/tok (FP8)</td></tr>
+        </tbody>
+      </table>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <strong style="font-size:13px;"><code>Gemma4MiniModel</code> — Okunabilir PyTorch Referansı</strong>
+        <button type="button" id="btn-copy-pytorch" class="btn btn-sm btn-primary">📋 Kodu Kopyala</button>
+      </div>
+      <pre class="code-block" id="pytorch-code"></pre>
+    </div>
+  </aside>
+</div>
+
+<script>
+(function () {
+  const root = document.getElementById('agentlab-sim-root');
+  if (!root || root.dataset.initialized === '1') return;
+  root.dataset.initialized = '1';
+
+  /* ==================== TAB 1 DATA (Verified Nov 2026) ==================== */
+  const HARDWARE_PROFILES = [
+    { id: 't4', name: 'NVIDIA Tesla T4 (Colab Baz)', memGb: 16, usableGb: 15, memType: 'GDDR6', bwGbs: 320, bwLabel: '320 GB/s', peakTflops: 65, stack: 'CUDA · llama.cpp · PyTorch', tdp: 70, cerebras: false, note: 'Colab baz katmanı (SM75). 15 GiB VRAM; 7,2 GB Q4 model + 512K FP8 KV rahat sığar.' },
+    { id: 'g4', name: 'NVIDIA RTX PRO 6000 Blackwell (G4)', memGb: 96, usableGb: 95.6, memType: 'GDDR7 ECC', bwGbs: 1792, bwLabel: '1.792 GB/s', peakTflops: 2000, stack: 'CUDA · vLLM · TRT-LLM · llama.cpp', tdp: 300, cerebras: false, note: 'SM120 GB202, donanımsal NVFP4 (~4.000 TOPS sparse). 96 GB VRAM ile devasa KV havuzu.' },
+    { id: 'h100', name: 'NVIDIA H100 SXM', memGb: 80, usableGb: 80, memType: 'HBM3', bwGbs: 3350, bwLabel: '3,35 TB/s', peakTflops: 1979, stack: 'CUDA · FlashAttention-3 · vLLM · TRT-LLM', tdp: 700, cerebras: false, note: 'Hopper SM90 referansı. Saf FP8 ağırlık + FP8 KV ile nicemleme kaybı olmadan yüksek throughput.' },
+    { id: 'h200', name: 'NVIDIA H200 SXM', memGb: 141, usableGb: 141, memType: 'HBM3e', bwGbs: 4800, bwLabel: '4,8 TB/s', peakTflops: 1979, stack: 'CUDA · FlashAttention-3 · vLLM · TRT-LLM', tdp: 700, cerebras: false, note: 'H100 ile aynı FP8 hesaplama çekirdeği, %43 daha hızlı HBM3e bellek bant genişliği.' },
+    { id: 'b300', name: 'NVIDIA B300 (GB300 NVL72)', memGb: 288, usableGb: 288, memType: 'HBM3e (12-Hi)', bwGbs: 8000, bwLabel: '8,0 TB/s', peakTflops: 15000, stack: 'CUDA · TRT-LLM · vLLM · SGLang · Dynamo', tdp: 1200, cerebras: false, note: 'Blackwell Ultra: 15 PFLOPS dense FP4 / GPU; 72 GPU tek 130 TB/s NVLink 5.0 alanında.' },
+    { id: 'mi455x', name: 'AMD Instinct MI455X (Helios)', memGb: 432, usableGb: 432, memType: 'HBM4 (12-stack)', bwGbs: 23300, bwLabel: '23,3 TB/s', peakTflops: 20150, stack: 'ROCm / HIP · vLLM · SGLang · AITER', tdp: 1400, cerebras: false, note: 'CDNA 5 + HBM4 ile GPU sınıfının en yüksek tek çip bant genişliği (~3.236 tok/s teorik).' },
+    { id: 'tpu8i', name: 'Google TPU 8i (Inference)', memGb: 288, usableGb: 288, memType: 'HBM + 384 MB SRAM', bwGbs: 8601, bwLabel: '8,6 TB/s', peakTflops: 10100, stack: 'JAX / XLA · TorchTPU · TPU Sync · vLLM-TPU', tdp: 650, cerebras: false, note: '3× genişletilmiş 384 MB Vmem SRAM + Boardfly CAE + LLM Decoder Engine.' },
+    { id: 'ascend950dt', name: 'Huawei Ascend 950DT (Decode)', memGb: 144, usableGb: 144, memType: 'HiZQ 2.0 HBM', bwGbs: 4000, bwLabel: '4,0 TB/s', peakTflops: 2000, stack: 'CANN · MindSpore · torch_npu · MindIE', tdp: 600, cerebras: false, note: 'Da Vinci v5 Decode/Eğitim çipi (prefill için ayrılmış 950PR 1,6 TB/s kardeşiyle eşleşir).' },
+    { id: 'm5ultra', name: 'Apple M5 Ultra (Mac Studio)', memGb: 512, usableGb: 512, memType: 'Unified LPDDR5X', bwGbs: 1200, bwLabel: '1,2 TB/s', peakTflops: 320, stack: 'Metal · MLX · llama.cpp · Core ML', tdp: 180, cerebras: false, note: 'Zero-copy 512 GB birleşik bellek + GPU içi gömülü Neural Accelerator birimleri.' },
+    { id: 'gb10', name: 'NVIDIA DGX Spark (GB10)', memGb: 128, usableGb: 128, memType: 'Unified LPDDR5X', bwGbs: 273, bwLabel: '273 GB/s', peakTflops: 500, stack: 'DGX OS · CUDA · NIM · vLLM · llama.cpp', tdp: 140, cerebras: false, note: '128 GB unified bellekte dev modeller sığar (~215 GB/s gerçek ölçüm); ConnectX-7 ile 2 ünite birleşebilir.' },
+    { id: 'gorgonhalo', name: 'AMD Gorgon Halo (Max+ PRO 495)', memGb: 192, usableGb: 192, memType: 'Unified LPDDR5X-8000', bwGbs: 256, bwLabel: '256 GB/s', peakTflops: 120, stack: 'ROCm / HIP · Vulkan (llama.cpp) · Ryzen AI', tdp: 120, cerebras: false, note: '256-bit birleşik bellekle 192 GB kapasite; büyük yerel MoE modelleri taşır ama BW duvarı belirgindir.' },
+    { id: 'wse3', name: 'Cerebras WSE-3 (CS-3 Wafer)', memGb: 44, usableGb: 44, memType: 'On-Chip SRAM', bwGbs: 21000000, bwLabel: '21 PB/s SRAM', peakTflops: 62500, stack: 'Cerebras SDK / CSL · Weight Streaming · PyTorch', tdp: 15000, cerebras: true, sramTokCeiling: 750, note: '44 GB On-Chip SRAM, 900.000 SLAC çekirdeği, 4T transistör. HBM duvarı tamamen ortadan kalkar.' },
+    { id: 'wse3t', name: 'Cerebras WSE-3T / CS-4 Wafer', memGb: 44, usableGb: 44, memType: 'On-Chip SRAM', bwGbs: 43200000, bwLabel: '43,2 PB/s SRAM', peakTflops: 125000, stack: 'Cerebras SDK / CSL · SwarmX · PyTorch', tdp: 15000, cerebras: true, sramTokCeiling: 1150, note: 'CS-4 içindeki WSE-3 Turbo: 43,2 PB/s SRAM + 250 PFLOPS sparse/wafer. GPT-5.6 Sol Ultrafast sınıfı.' }
+  ];
+
+  const MODEL_FOOTPRINTS = [
+    { id: 'gemma4_q4', name: 'Gemma 4 12B Q4 (7,2 GB)', gb: 7.2, aiDecode: 1.8 },
+    { id: 'gemma4_fp8', name: 'Gemma 4 12B FP8 (14,4 GB)', gb: 14.4, aiDecode: 1.9 },
+    { id: 'qwen38_q4', name: 'Qwen 3.8 27B Q4 (17,7 GB)', gb: 17.7, aiDecode: 2.0 },
+    { id: 'ds41_fp4', name: 'DeepSeek V4.1 Decode 16B FP4 (~9 GB)', gb: 9.0, aiDecode: 1.6 }
+  ];
+
+  /* ==================== TAB 1 STATE & RENDER ==================== */
+  const t1HwSel = document.getElementById('t1-hw');
+  const t1ModSel = document.getElementById('t1-model');
+  HARDWARE_PROFILES.forEach(h => {
+    const opt = document.createElement('option');
+    opt.value = h.id;
+    opt.textContent = `${h.name} — ${h.bwLabel} · ${h.memGb} GB ${h.memType}`;
+    t1HwSel.appendChild(opt);
+  });
+  t1HwSel.value = 'h100';
+  MODEL_FOOTPRINTS.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.name;
+    t1ModSel.appendChild(opt);
+  });
+
+  let t1AnimRunning = true;
+  let t1AnimTick = 0;
+
+  function fmtInt(n) {
+    return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+
+  function renderTab1() {
+    const hw = HARDWARE_PROFILES.find(h => h.id === t1HwSel.value) || HARDWARE_PROFILES[0];
+    const mod = MODEL_FOOTPRINTS.find(m => m.id === t1ModSel.value) || MODEL_FOOTPRINTS[0];
+    const fits = mod.gb <= hw.usableGb;
+    const tightT4 = hw.id === 't4' && mod.gb > 13.5 && mod.gb <= 15;
+
+    document.getElementById('t1-kpi-mem').textContent = `${hw.memGb} GB ${hw.memType}`;
+    const fitEl = document.getElementById('t1-kpi-fit');
+    if (!fits) {
+      fitEl.textContent = `❌ ${mod.gb} GB sığmaz (VRAM Aşımı / Offload gerekir)`;
+      fitEl.style.color = 'var(--rose)';
+    } else if (tightT4) {
+      fitEl.textContent = `⚠️ ${mod.gb} GB sınırda (KV havuzu çok dar)`;
+      fitEl.style.color = 'var(--amber)';
+    } else {
+      fitEl.textContent = `✅ ${mod.gb} GB sığar (${(hw.usableGb - mod.gb).toFixed(1)} GB KV payı)`;
+      fitEl.style.color = 'var(--emerald)';
+    }
+
+    document.getElementById('t1-kpi-bw').textContent = hw.bwLabel;
+    document.getElementById('t1-kpi-stack').textContent = hw.stack;
+
+    const theoEl = document.getElementById('t1-kpi-theo');
+    const pracEl = document.getElementById('t1-kpi-prac');
+    const theoSub = document.getElementById('t1-kpi-formula');
+    const pracSub = document.getElementById('t1-kpi-prac-sub');
+
+    if (hw.cerebras) {
+      const sramMax = hw.bwGbs / mod.gb;
+      theoEl.textContent = `~${(sramMax / 1e6).toFixed(2)}M tok/s*`;
+      theoSub.textContent = 'On-chip SRAM teorik tavan (HBM duvarı yok)';
+      const pracC = Math.round(hw.sramTokCeiling * (7.2 / mod.gb));
+      pracEl.textContent = `~${fmtInt(pracC)} tok/s`;
+      pracSub.textContent = 'Pratik: wafer fabric + compute sınırlı';
+    } else {
+      const theo = hw.bwGbs / mod.gb;
+      const prac = theo * 0.70;
+      theoEl.textContent = `~${fmtInt(theo)} tok/s`;
+      theoSub.textContent = `${fmtInt(hw.bwGbs)} GB/s ÷ ${mod.gb.toFixed(1).replace('.', ',')} GB`;
+      pracEl.textContent = fits ? `~${fmtInt(prac)} tok/s` : 'PCIe Offload!';
+      pracSub.textContent = fits ? 'Teorik × ~0,70 (çekirdek + KV ek yükü)' : 'RAM↔VRAM transferi hızı 5–15× düşürür';
+    }
+
+    const warnEl = document.getElementById('t1-vram-warn');
+    if (!fits) {
+      warnEl.style.display = 'block';
+      warnEl.innerHTML = `<strong>⚠️ Bellek Kapasitesi Aşımı:</strong> <code>${mod.name}</code> ağırlığı tek başına <code>${mod.gb} GB</code> tutar ve <code>${hw.name}</code> kullanılabilir belleğini (<code>${hw.usableGb} GB</code>) aşar; model katmanlarının host RAM'e taşması decode hızını PCIe bant genişliğine kilitler.`;
+    } else if (tightT4) {
+      warnEl.style.display = 'block';
+      warnEl.innerHTML = `<strong>⚠️ Sıkı VRAM Payı:</strong> <code>${mod.name}</code> T4 üzerinde neredeyse tüm <code>15 GiB</code> VRAM'i doldurur; uzun bağlam KV havuzu için Q4 (<code>7,2 GB</code>) gerekir.`;
+    } else {
+      warnEl.style.display = 'none';
+    }
+
+    // Pipeline badges & meters
+    const pBadge = document.getElementById('t1-pipe-badge');
+    const bwMeter = document.getElementById('t1-bw-meter');
+    const tcMeter = document.getElementById('t1-tc-meter');
+    const satText = document.getElementById('t1-sat-text');
+    const pipeDesc = document.getElementById('t1-pipe-desc');
+
+    if (hw.cerebras) {
+      pBadge.className = 'badge b-violet';
+      pBadge.textContent = 'On-Chip SRAM · Wafer Fabric / Compute';
+      bwMeter.style.width = '18%';
+      bwMeter.style.background = 'var(--cyan)';
+      tcMeter.style.width = '78%';
+      tcMeter.style.background = 'var(--emerald)';
+      satText.textContent = 'SRAM BW: %18 | SLAC Çekirdek: %78 (HBM Duvarı Yok)';
+      pipeDesc.textContent = hw.note;
+    } else {
+      const ridge = (hw.peakTflops * 1000) / hw.bwGbs;
+      const tcUtil = Math.min(28, Math.max(1.2, (mod.aiDecode / ridge) * 100));
+      pBadge.className = 'badge b-rose';
+      pBadge.textContent = 'Memory-Bound (Bellek Duvarı)';
+      bwMeter.style.width = '96%';
+      bwMeter.style.background = 'var(--rose)';
+      tcMeter.style.width = `${tcUtil.toFixed(1)}%`;
+      tcMeter.style.background = 'var(--emerald)';
+      satText.textContent = `Bellek Yolu: %96 | Tensor Core: %${tcUtil.toFixed(1)}`;
+      pipeDesc.textContent = hw.note;
+    }
+
+    drawTab1Pipeline(hw, mod, fits);
+    drawTab1Roofline(hw, mod);
+  }
+
+  function drawTab1Pipeline(hw, mod, fits) {
+    const svg = document.getElementById('t1-pipeline-svg');
+    const ns = 'http://www.w3.org/2000/svg';
+    svg.innerHTML = '';
+
+    function el(tag, attrs, text) {
+      const node = document.createElementNS(ns, tag);
+      for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    const isC = hw.cerebras;
+    // Draw 4 stages
+    const boxes = [
+      { x: 20, y: 36, w: 155, h: 120, title: isC ? 'MemoryX (Dış)' : `${hw.memType}`, sub: isC ? 'Model 44 GB SRAM içinde!' : `${hw.memGb} GB · ${hw.bwLabel}`, col: isC ? '#475569' : (fits ? '#fb7185' : '#e11d48'), dim: isC },
+      { x: 210, y: 50, w: 150, h: 92, title: isC ? '2D Mesh Fabric' : 'L2 Cache', sub: isC ? '53,5–214 Pb/s' : 'On-die ara önbellek', col: '#fbbf24', dim: false },
+      { x: 395, y: 36, w: 160, h: 120, title: isC ? '44 GB On-Chip SRAM' : 'On-Chip SRAM', sub: isC ? `${hw.bwLabel} · 0 HBM` : 'FlashAttention Tiling', col: '#38bdf8', dim: false },
+      { x: 600, y: 46, w: 140, h: 100, title: isC ? '900K SLAC Çekirdek' : 'Tensor Cores', sub: `${fmtInt(hw.peakTflops)} TFLOPS`, col: '#34d399', dim: false }
+    ];
+
+    // Connectors
+    const pipes = [
+      { x1: 175, x2: 210, y: 96, col: isC ? '#334155' : '#fb7185', w: isC ? 2 : 7, dash: isC ? '4 4' : '' },
+      { x1: 360, x2: 395, y: 96, col: '#fbbf24', w: 6, dash: '' },
+      { x1: 555, x2: 600, y: 96, col: '#38bdf8', w: isC ? 12 : 8, dash: '' }
+    ];
+    pipes.forEach(p => {
+      const l = el('line', { x1: p.x1, y1: p.y, x2: p.x2, y2: p.y, stroke: p.col, 'stroke-width': p.w, 'stroke-opacity': '0.5' });
+      if (p.dash) l.setAttribute('stroke-dasharray', p.dash);
+      svg.appendChild(l);
+    });
+
+    boxes.forEach(b => {
+      svg.appendChild(el('rect', {
+        x: b.x, y: b.y, width: b.w, height: b.h, rx: 10,
+        fill: b.dim ? '#0a0f1c' : '#101a2e',
+        stroke: b.col, 'stroke-width': b.dim ? 1.2 : 2,
+        'stroke-dasharray': b.dim ? '5 4' : ''
+      }));
+      svg.appendChild(el('text', { x: b.x + b.w / 2, y: b.y + 44, 'text-anchor': 'middle', fill: b.dim ? '#64748b' : '#f8fafc', 'font-size': '13', 'font-weight': '700' }, b.title));
+      svg.appendChild(el('text', { x: b.x + b.w / 2, y: b.y + 66, 'text-anchor': 'middle', fill: b.dim ? '#64748b' : b.col, 'font-size': '11.5', 'font-family': 'monospace', 'font-weight': '700' }, b.sub));
+      if (b.x === 395) {
+        svg.appendChild(el('text', { x: b.x + b.w / 2, y: b.y + 92, 'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '10.5' }, isC ? `Aktif: ${mod.gb} GB sığdı` : 'K·V tile HBM’e dönmez'));
+      }
+    });
+
+    // Bottom Comparison Strip: HBM vs SRAM packet lanes
+    svg.appendChild(el('rect', { x: 20, y: 176, width: 720, height: 78, rx: 9, fill: '#0c1322', stroke: '#233354' }));
+    svg.appendChild(el('text', { x: 34, y: 196, fill: '#cbd5e1', 'font-size': '11.5', 'font-weight': '700' },
+      isC ? 'Aktif Mod: Cerebras On-Chip SRAM Mesh (44 GB direkt çekirdek yanında — HBM kuyruğu yok)'
+          : `Aktif Mod: ${hw.memType} Darboğazı (${hw.bwLabel}) — ${mod.gb} GB ağırlık her decode adımında çekilir`));
+
+    // Packet lanes
+    svg.appendChild(el('rect', { x: 34, y: 208, width: 690, height: 14, rx: 4, fill: '#060a13', stroke: '#1e293b' }));
+    svg.appendChild(el('rect', { x: 34, y: 229, width: 690, height: 14, rx: 4, fill: '#060a13', stroke: '#1e293b' }));
+    svg.appendChild(el('text', { x: 40, y: 218, fill: '#fb7185', 'font-size': '9.5', 'font-family': 'monospace' }, 'HBM → Core'));
+    svg.appendChild(el('text', { x: 40, y: 239, fill: '#38bdf8', 'font-size': '9.5', 'font-family': 'monospace' }, 'SRAM Tile'));
+
+    const pktLayer = el('g', { id: 't1-pkt-layer' });
+    svg.appendChild(pktLayer);
+    updateTab1Packets();
+  }
+
+  function updateTab1Packets() {
+    const pktLayer = document.getElementById('t1-pkt-layer');
+    if (!pktLayer) return;
+    const hw = HARDWARE_PROFILES.find(h => h.id === t1HwSel.value) || HARDWARE_PROFILES[0];
+    const ns = 'http://www.w3.org/2000/svg';
+    pktLayer.innerHTML = '';
+
+    const speedFactor = hw.cerebras ? 4.2 : Math.max(0.45, Math.log10(hw.bwGbs / 100 + 1) * 1.35);
+    const countHbm = hw.cerebras ? 0 : 7;
+    const countSram = hw.cerebras ? 14 : 9;
+
+    for (let i = 0; i < countHbm; i++) {
+      const x = 112 + ((t1AnimTick * speedFactor * 2.2 + i * 86) % 602);
+      const c = document.createElementNS(ns, 'rect');
+      c.setAttribute('x', x.toFixed(1));
+      c.setAttribute('y', '210');
+      c.setAttribute('width', '14');
+      c.setAttribute('height', '10');
+      c.setAttribute('rx', '3');
+      c.setAttribute('fill', '#fb7185');
+      pktLayer.appendChild(c);
+    }
+    for (let i = 0; i < countSram; i++) {
+      const x = 112 + ((t1AnimTick * (hw.cerebras ? 7.2 : 4.2) + i * 44) % 602);
+      const c = document.createElementNS(ns, 'rect');
+      c.setAttribute('x', x.toFixed(1));
+      c.setAttribute('y', '231');
+      c.setAttribute('width', hw.cerebras ? '24' : '16');
+      c.setAttribute('height', '10');
+      c.setAttribute('rx', '3');
+      c.setAttribute('fill', hw.cerebras ? '#34d399' : '#38bdf8');
+      pktLayer.appendChild(c);
+    }
+
+    // Pipeline dots across top boxes
+    const startX = hw.cerebras ? 395 : 175;
+    const spanX = hw.cerebras ? 210 : 430;
+    for (let i = 0; i < (hw.cerebras ? 6 : 5); i++) {
+      const px = startX + ((t1AnimTick * speedFactor * 2.5 + i * (spanX / 5)) % spanX);
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', px.toFixed(1));
+      dot.setAttribute('cy', '96');
+      dot.setAttribute('r', hw.cerebras ? '5.5' : '4.5');
+      dot.setAttribute('fill', hw.cerebras ? '#34d399' : (px < 360 ? '#fb7185' : '#38bdf8'));
+      pktLayer.appendChild(dot);
+    }
+  }
+
+  function drawTab1Roofline(hw, mod) {
+    const svg = document.getElementById('t1-roofline-svg');
+    const ns = 'http://www.w3.org/2000/svg';
+    svg.innerHTML = '';
+
+    function el(tag, attrs, text) {
+      const node = document.createElementNS(ns, tag);
+      for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    // Log-log mapping: X: AI [0.25 .. 1024] -> [55 .. 515], Y: TFLOPS [0.2 .. 200000] -> [205 .. 22]
+    const xMin = Math.log10(0.25), xMax = Math.log10(1024);
+    const yMin = Math.log10(0.2), yMax = Math.log10(200000);
+    const mapX = ai => 55 + ((Math.log10(ai) - xMin) / (xMax - xMin)) * 460;
+    const mapY = tf => 205 - ((Math.log10(Math.max(0.2, Math.min(200000, tf))) - yMin) / (yMax - yMin)) * 183;
+
+    // Gridlines
+    [0.5, 1, 4, 16, 64, 256, 1024].forEach(ai => {
+      const gx = mapX(ai);
+      svg.appendChild(el('line', { x1: gx, y1: 20, x2: gx, y2: 205, stroke: '#162238', 'stroke-width': 1 }));
+      svg.appendChild(el('text', { x: gx, y: 221, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '10', 'font-family': 'monospace' }, ai));
+    });
+    [1, 10, 100, 1000, 10000, 100000].forEach(tf => {
+      const gy = mapY(tf);
+      svg.appendChild(el('line', { x1: 55, y1: gy, x2: 515, y2: gy, stroke: '#162238', 'stroke-width': 1 }));
+      const lbl = tf >= 1000 ? `${tf / 1000}P` : `${tf}T`;
+      svg.appendChild(el('text', { x: 48, y: gy + 3, 'text-anchor': 'end', fill: '#64748b', 'font-size': '10', 'font-family': 'monospace' }, lbl));
+    });
+
+    svg.appendChild(el('text', { x: 285, y: 235, 'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '10.5' }, 'Aritmetik Yoğunluk (FLOP / Byte) →'));
+
+    const bwTbs = hw.bwGbs / 1000; // TB/s = TFLOPS / (FLOP/Byte)
+    const ridgeAI = hw.peakTflops / bwTbs;
+    document.getElementById('t1-ridge-badge').textContent = hw.cerebras ? 'Ridge < 3 FLOP/B (SRAM)' : `Ridge: ${ridgeAI.toFixed(0)} FLOP/B`;
+
+    // Roofline polyline
+    const pts = [];
+    for (let ai = 0.25; ai <= 1024; ai *= 1.25) {
+      const perf = Math.min(hw.peakTflops, bwTbs * ai);
+      pts.push(`${mapX(ai).toFixed(1)},${mapY(perf).toFixed(1)}`);
+    }
+    pts.push(`${mapX(1024).toFixed(1)},${mapY(Math.min(hw.peakTflops, bwTbs * 1024)).toFixed(1)}`);
+    svg.appendChild(el('polyline', { points: pts.join(' '), fill: 'none', stroke: '#38bdf8', 'stroke-width': 3 }));
+
+    // Ridge marker
+    if (ridgeAI >= 0.25 && ridgeAI <= 1024) {
+      const rx = mapX(ridgeAI), ry = mapY(hw.peakTflops);
+      svg.appendChild(el('line', { x1: rx, y1: ry, x2: rx, y2: 205, stroke: '#fbbf24', 'stroke-dasharray': '4 3', 'stroke-width': 1.2 }));
+      svg.appendChild(el('circle', { cx: rx, cy: ry, r: 4, fill: '#fbbf24' }));
+    }
+
+    // Decode Point (B=1)
+    const decodePerf = Math.min(hw.peakTflops, bwTbs * mod.aiDecode);
+    const dx = mapX(mod.aiDecode), dy = mapY(decodePerf);
+    svg.appendChild(el('circle', { cx: dx, cy: dy, r: 6.5, fill: hw.cerebras ? '#a78bfa' : '#fb7185', stroke: '#f8fafc', 'stroke-width': 1.5 }));
+    svg.appendChild(el('text', { x: dx + 10, y: dy + 4, fill: hw.cerebras ? '#ddd6fe' : '#fda4af', 'font-size': '11', 'font-weight': '700' },
+      hw.cerebras ? 'Decode B=1 (SRAM ~750+ t/s)' : `Decode B=1 (${decodePerf.toFixed(2)} TF)`));
+
+    // Prefill Point (B=512)
+    const prefillAI = 280;
+    const prefillPerf = Math.min(hw.peakTflops, bwTbs * prefillAI);
+    const px = mapX(prefillAI), py = mapY(prefillPerf);
+    svg.appendChild(el('circle', { cx: px, cy: py, r: 6.5, fill: '#34d399', stroke: '#f8fafc', 'stroke-width': 1.5 }));
+    svg.appendChild(el('text', { x: px - 10, y: py - 10, 'text-anchor': 'end', fill: '#6ee7b7', 'font-size': '11', 'font-weight': '700' }, `Prefill B=512 (${fmtInt(prefillPerf)} TF)`));
+  }
+
+  /* ==================== TAB 2: CHUNKED PREFILL vs GEMV vs BATCHING ==================== */
+  const T2_GPUS = {
+    t4:   { name: 'Tesla T4', bw: 320,  peak: 65,   costHr: 0.35, idleW: 28, maxW: 70,  baseTps: 31 },
+    g4:   { name: 'G4 Blackwell', bw: 1792, peak: 1200, costHr: 1.40, idleW: 72, maxW: 285, baseTps: 174 },
+    h100: { name: 'H100 SXM', bw: 3350, peak: 1979, costHr: 2.50, idleW: 150, maxW: 650, baseTps: 326 }
+  };
+
+  let t2Step = 0; // 0..4
+  let t2SubProgress = 0; // 0..100
+  let t2Playing = false;
+  let t2Timer = null;
+
+  const t2GpuSel = document.getElementById('t2-gpu');
+  const t2UbatchSl = document.getElementById('t2-ubatch');
+  const t2PromptSl = document.getElementById('t2-prompt-len');
+  const t2UsersSl = document.getElementById('t2-users');
+
+  // Build 32 KV shelf cells and 16 batch lane badges
+  const kvShelvesEl = document.getElementById('t2-kv-shelves');
+  for (let i = 0; i < 32; i++) {
+    const d = document.createElement('div');
+    d.className = 'kv-cell';
+    kvShelvesEl.appendChild(d);
+  }
+  const batchLanesEl = document.getElementById('t2-batch-lanes');
+  for (let i = 0; i < 16; i++) {
+    const d = document.createElement('div');
+    d.className = 'user-lane';
+    d.textContent = `U${i + 1}`;
+    batchLanesEl.appendChild(d);
+  }
+
+  function renderTab2() {
+    const gpu = T2_GPUS[t2GpuSel.value];
+    const B = Number(t2UbatchSl.value);
+    const T = Number(t2PromptSl.value);
+    const N = Number(t2UsersSl.value);
+    const chunks = Math.max(1, Math.ceil(T / B));
+
+    document.getElementById('t2-ubatch-val').textContent = B;
+    document.getElementById('t2-prompt-val').textContent = `${fmtInt(T)} tok (${chunks} chunk)`;
+    document.getElementById('t2-users-val').textContent = `${N} kullanıcı`;
+    document.getElementById('t2-step-prefill-dim').textContent = `[${B} × 3840] × W GEMM`;
+    document.getElementById('t2-step-batch-dim').textContent = `[${N} × 3840] × W ${N > 1 ? 'GEMM' : 'GEMV'}`;
+
+    document.querySelectorAll('#t2-steps .stage-step').forEach(el => {
+      el.classList.toggle('active', Number(el.dataset.step) === t2Step);
+    });
+
+    const stageMeta = [
+      {
+        title: 'Aşama 1: Tokenization (Metin → Token IDs)',
+        badge: 'CPU / Tokenizer', bCls: 'b-cyan',
+        desc: `Girdi metni ${fmtInt(T)} token ID'ye bölünür (V=262.144). Henüz GPU ağırlık matrisi okunmaz.`,
+        eq: `ids: int32[${T}] → ${chunks} ubatch chunk`,
+        tc: 4, hbm: 8, tps: gpu.baseTps
+      },
+      {
+        title: 'Aşama 2: Embedding Lookup E[ids]',
+        badge: 'Gather / Bellek İndeksleme', bCls: 'b-cyan',
+        desc: `262.144 × 3.840 boyutlu gömme tablosundan yalnızca ${fmtInt(T)} satır çekilir: aktivasyon tensörü [${T} × 3840].`,
+        eq: `E[ids] → Aktivasyon [${T} × 3840]`,
+        tc: 8, hbm: 22, tps: gpu.baseTps
+      },
+      {
+        title: `Aşama 3: Chunked Prefill (--ubatch-size=${B})`,
+        badge: 'Compute-Bound GEMM', bCls: 'b-emerald',
+        desc: `${fmtInt(T)} token, ${chunks} adet [${B} × 3840] parçaya bölünür. Ağırlık W 1 kez yüklenir, ${B} token aynı anda çarpılır → Tensor Core YEŞİL!`,
+        eq: `[${B} × 3840] × W[3840 × d]  (GEMM · Chunk ${Math.min(chunks, Math.max(1, Math.ceil((t2SubProgress / 100) * chunks)))}/${chunks})`,
+        tc: Math.min(96, 58 + (B / 512) * 38), hbm: 48, tps: gpu.baseTps * Math.min(28, 6 + B / 28)
+      },
+      {
+        title: 'Aşama 4: Saf Autoregressive Decode (Batch=1)',
+        badge: 'Memory-Bound GEMV ❌', bCls: 'b-rose',
+        desc: 'Tek token üretmek için [1 × 3840] vektörü tüm W ağırlığıyla çarpılır (GEMV). HBM yolu %96 kızarır, Tensor Core neredeyse boş bekler!',
+        eq: '[1 × 3840] × W[3840 × d]  (GEMV · 1 tok/adım)',
+        tc: 2.2, hbm: 97, tps: gpu.baseTps
+      },
+      {
+        title: `Aşama 5: Continuous Batching (N=${N} Eşzamanlı Kullanıcı)`,
+        badge: N >= 8 ? 'Batched GEMM ⚡' : 'Hafif Batch GEMM', bCls: N >= 8 ? 'b-emerald' : 'b-amber',
+        desc: `${N} kullanıcının tekil vektörleri [${N} × 3840] matrisinde birleşir. W ağırlığı HBM'den yine 1 kez okunur; $/1M Token ve Joule/Token keskin düşer!`,
+        eq: `[${N} × 3840] × W[3840 × d]  (${N > 1 ? 'Batched GEMM' : 'Tekil GEMV'})`,
+        tc: Math.min(92, 2.2 + N * 1.45),
+        hbm: Math.max(68, 97 - N * 0.35),
+        // Sublinear overhead from KV reads as N grows: ~N^0.86 scaling up to compute roof
+        tps: gpu.baseTps * Math.pow(N, 0.87) * (1 / (1 + N * 0.008))
+      }
+    ];
+
+    const m = stageMeta[t2Step];
+    document.getElementById('t2-stage-title').textContent = m.title;
+    const opB = document.getElementById('t2-op-badge');
+    opB.className = `badge ${m.bCls}`;
+    opB.textContent = m.badge;
+    document.getElementById('t2-stage-desc').textContent = m.desc;
+    document.getElementById('t2-matrix-eq').textContent = m.eq;
+
+    // Meters
+    const tcEl = document.getElementById('t2-tc-val');
+    tcEl.textContent = `%${m.tc.toFixed(1)}`;
+    tcEl.style.color = m.tc > 45 ? 'var(--emerald)' : (m.tc > 12 ? 'var(--amber)' : 'var(--rose)');
+    document.getElementById('t2-tc-bar').style.width = `${m.tc}%`;
+    document.getElementById('t2-tc-bar').style.background = m.tc > 45 ? 'var(--emerald)' : (m.tc > 12 ? 'var(--amber)' : 'var(--rose)');
+
+    const hbmEl = document.getElementById('t2-hbm-val');
+    hbmEl.textContent = `%${m.hbm.toFixed(0)}`;
+    document.getElementById('t2-hbm-bar').style.width = `${m.hbm}%`;
+    document.getElementById('t2-hbm-bar').style.background = m.hbm > 85 ? 'var(--rose)' : 'var(--cyan)';
+
+    // Economics & Energy
+    const sysTps = m.tps;
+    const perUserTps = t2Step === 4 ? sysTps / N : sysTps;
+    const powerW = gpu.idleW + (gpu.maxW - gpu.idleW) * (0.28 + 0.72 * (m.tc / 100));
+    const cost1M = (gpu.costHr / (sysTps * 3600)) * 1_000_000;
+    const jouleTok = powerW / sysTps;
+
+    document.getElementById('t2-tps').textContent = `${fmtInt(sysTps)} tok/s`;
+    document.getElementById('t2-per-user-tps').textContent = `Kullanıcı başı: ${perUserTps.toFixed(1)} tok/s`;
+    document.getElementById('t2-cost').textContent = `$${cost1M.toFixed(3)}`;
+    document.getElementById('t2-joule').textContent = `${jouleTok.toFixed(2)} J/tok`;
+    document.getElementById('t2-watt').textContent = `Anlık güç: ${Math.round(powerW)} W (${gpu.name})`;
+
+    // KV shelves visual
+    const cells = kvShelvesEl.children;
+    let filledCount = 0;
+    let activeIdx = -1;
+    if (t2Step === 2) {
+      filledCount = Math.round((t2SubProgress / 100) * 26);
+      activeIdx = Math.min(25, filledCount);
+    } else if (t2Step >= 3) {
+      filledCount = 26 + Math.min(6, Math.round((t2SubProgress / 100) * 6));
+    }
+    for (let i = 0; i < 32; i++) {
+      cells[i].className = 'kv-cell';
+      if (i < filledCount) cells[i].classList.add(i >= 26 ? 'decode-tok' : 'filled');
+      if (t2Step === 2 && i === activeIdx) cells[i].classList.add('active-chunk');
+    }
+    document.getElementById('t2-kv-progress').textContent =
+      t2Step < 2 ? `0 / ${chunks} chunk` :
+      t2Step === 2 ? `${Math.min(chunks, Math.max(1, Math.ceil((t2SubProgress / 100) * chunks)))} / ${chunks} chunk` :
+      `${chunks}/${chunks} prefill + decode append`;
+
+    // Batch lanes visual
+    const activeLanes = t2Step === 4 ? Math.min(16, Math.max(1, Math.round((N / 64) * 16))) : 1;
+    Array.from(batchLanesEl.children).forEach((lane, idx) => {
+      const on = idx < activeLanes;
+      lane.classList.toggle('on', on);
+      lane.textContent = on ? (N > 16 && idx === 15 ? `U16..${N}` : `U${idx + 1} ✓`) : `Boş`;
+    });
+    document.getElementById('t2-lane-summary').textContent = `${t2Step === 4 ? N : 1} / 64 eşzamanlı kullanıcı`;
+
+    drawTab2MatrixSvg(t2Step, B, T, N, m.tc);
+  }
+
+  function drawTab2MatrixSvg(step, B, T, N, tc) {
+    const svg = document.getElementById('t2-svg');
+    const ns = 'http://www.w3.org/2000/svg';
+    svg.innerHTML = '';
+    function el(tag, attrs, text) {
+      const node = document.createElementNS(ns, tag);
+      for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    const rowsA = step === 0 ? 12 : step === 1 ? 36 : step === 2 ? Math.max(20, Math.round((B / 512) * 76)) : step === 3 ? 8 : Math.max(10, Math.round((N / 64) * 76));
+    const colA = step === 2 ? '#34d399' : step === 3 ? '#fb7185' : step === 4 ? (N >= 8 ? '#34d399' : '#fbbf24') : '#38bdf8';
+
+    // Matrix A (Input activations)
+    svg.appendChild(el('rect', { x: 24, y: 68 - rowsA / 2, width: 120, height: rowsA, rx: 4, fill: colA, 'fill-opacity': '0.28', stroke: colA, 'stroke-width': 2 }));
+    svg.appendChild(el('text', { x: 84, y: 126, 'text-anchor': 'middle', fill: '#e2e8f0', 'font-size': '11.5', 'font-family': 'monospace' },
+      step === 2 ? `[${B} × 3840]` : step === 3 ? '[1 × 3840] vektör' : step === 4 ? `[${N} × 3840]` : `[${T} ID]`));
+
+    svg.appendChild(el('text', { x: 168, y: 74, 'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '18', 'font-weight': '700' }, '×'));
+
+    // Matrix W (Weights loaded from HBM)
+    svg.appendChild(el('rect', { x: 192, y: 20, width: 120, height: 92, rx: 5, fill: '#121c31', stroke: step === 3 ? '#fb7185' : '#64748b', 'stroke-width': 2 }));
+    svg.appendChild(el('text', { x: 252, y: 63, 'text-anchor': 'middle', fill: '#f8fafc', 'font-size': '12.5', 'font-weight': '700' }, 'W Ağırlığı'));
+    svg.appendChild(el('text', { x: 252, y: 80, 'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '10.5', 'font-family': 'monospace' }, 'HBM’den 1× okuma'));
+
+    svg.appendChild(el('text', { x: 336, y: 74, 'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '18', 'font-weight': '700' }, '='));
+
+    // Output / Tensor Core Tile
+    svg.appendChild(el('rect', { x: 360, y: 68 - rowsA / 2, width: 110, height: rowsA, rx: 4, fill: colA, 'fill-opacity': '0.22', stroke: colA, 'stroke-width': 2 }));
+    svg.appendChild(el('text', { x: 415, y: 126, 'text-anchor': 'middle', fill: '#e2e8f0', 'font-size': '11.5', 'font-family': 'monospace' },
+      step === 3 ? '1 yeni token' : step === 4 ? `${N} paralel token` : 'KV Projeksiyon'));
+
+    // Tensor Core Gauge Box
+    svg.appendChild(el('rect', { x: 500, y: 20, width: 160, height: 110, rx: 8, fill: '#0c1322', stroke: tc > 45 ? '#34d399' : '#fb7185', 'stroke-width': 1.8 }));
+    svg.appendChild(el('text', { x: 580, y: 42, 'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '11', 'font-weight': '700' }, 'TENSOR CORES'));
+    svg.appendChild(el('text', { x: 580, y: 78, 'text-anchor': 'middle', fill: tc > 45 ? '#34d399' : (tc > 12 ? '#fbbf24' : '#fb7185'), 'font-size': '26', 'font-weight': '700', 'font-family': 'monospace' }, `%${tc.toFixed(0)}`));
+    svg.appendChild(el('text', { x: 580, y: 102, 'text-anchor': 'middle', fill: '#cbd5e1', 'font-size': '11' }, tc > 45 ? 'GEMM Doygunluğu ✓' : (step === 3 ? 'HBM Bekliyor ❌' : 'Ön Hazırlık / Hibrit')));
+  }
+
+  function advanceTab2() {
+    t2SubProgress += 25;
+    if (t2SubProgress > 100) {
+      t2SubProgress = 0;
+      t2Step = (t2Step + 1) % 5;
+    }
+    renderTab2();
+  }
+
+  document.getElementById('t2-play').addEventListener('click', () => {
+    if (t2Playing) return;
+    t2Playing = true;
+    t2Timer = setInterval(advanceTab2, 420);
+  });
+  document.getElementById('t2-pause').addEventListener('click', () => {
+    t2Playing = false;
+    if (t2Timer) { clearInterval(t2Timer); t2Timer = null; }
+  });
+  document.getElementById('t2-step').addEventListener('click', () => {
+    t2Playing = false;
+    if (t2Timer) { clearInterval(t2Timer); t2Timer = null; }
+    t2SubProgress = 100;
+    t2Step = (t2Step + 1) % 5;
+    renderTab2();
+  });
+  document.getElementById('t2-reset').addEventListener('click', () => {
+    t2Playing = false;
+    if (t2Timer) { clearInterval(t2Timer); t2Timer = null; }
+    t2Step = 0;
+    t2SubProgress = 0;
+    renderTab2();
+  });
+  document.querySelectorAll('#t2-steps .stage-step').forEach(el => {
+    el.addEventListener('click', () => {
+      t2Step = Number(el.dataset.step);
+      t2SubProgress = 60;
+      renderTab2();
+    });
+  });
+  [t2GpuSel, t2UbatchSl, t2PromptSl, t2UsersSl].forEach(el => el.addEventListener('input', renderTab2));
+
+  /* ==================== TAB 3: KV CACHE, PREFIX CACHING & L4 CASE STUDY ==================== */
+  let t3Ctx = 1048576;
+  let t3Slots = 1;
+  let t3Warm = true;
+
+  // Exact per-token + fixed state formulas (in GB = 10^9 B or GiB approx clearly labeled)
+  const KV_ARCHS = [
+    {
+      name: 'Klasik 48L FP16 MHA',
+      sub: '48L × 2(K,V) × 16H × 256d × 2B = 768 KB/tok',
+      perTokBytes: 786432,
+      fixedBytes: 0,
+      capWindow: null,
+      color: '#fb7185'
+    },
+    {
+      name: 'Qwen 3.8 27B (3:1 DeltaNet + Full FP8)',
+      sub: '48 Gated DeltaNet (~147 MB sabit) + 16 Full (4KV×256 FP8 = 32 KB/tok)',
+      perTokBytes: 32768,
+      fixedBytes: 147 * 1024 * 1024,
+      capWindow: null,
+      color: '#fbbf24'
+    },
+    {
+      name: 'Gemma 4 12B FP16 (40 SWA@1024 + 8 Global K=V)',
+      sub: '8 Global × 1KV × 512 × K=V = 8 KB/tok + 320 MiB sabit SWA',
+      perTokBytes: 8192,
+      fixedBytes: 40 * 2 * 8 * 256 * 2 * 1024,
+      capWindow: null,
+      color: '#38bdf8'
+    },
+    {
+      name: 'Gemma 4 12B FP8 (f8_e4m3)',
+      sub: '8 Global × 1KV × 512 × K=V FP8 = 4 KB/tok + 160 MiB sabit SWA → ~4 GiB @ 1M',
+      perTokBytes: 4096,
+      fixedBytes: 40 * 2 * 8 * 256 * 1 * 1024,
+      capWindow: null,
+      color: '#34d399'
+    },
+    {
+      name: 'DeepSeek-V4-Flash (Latent MLA KV)',
+      sub: 'Sıkıştırılmış latent KV ~3,5 KB/tok',
+      perTokBytes: 3584,
+      fixedBytes: 0,
+      capWindow: null,
+      color: '#2dd4bf'
+    },
+    {
+      name: 'DeepSeek-V4.1-Flash (CED + CSA2 + FP4 KV)',
+      sub: '890 B/tok → 1M bağlamda < 0,9 GB!',
+      perTokBytes: 890,
+      fixedBytes: 0,
+      capWindow: null,
+      color: '#a78bfa'
+    }
+  ];
+
+  function fmtSize(bytes) {
+    const gb = bytes / (1024 * 1024 * 1024);
+    if (gb >= 1) return `${gb.toFixed(gb >= 100 ? 0 : 2).replace('.', ',')} GiB`;
+    const mb = bytes / (1024 * 1024);
+    return `${mb.toFixed(1).replace('.', ',')} MiB`;
+  }
+
+  function renderTab3() {
+    const ctxLbl = t3Ctx === 1048576 ? '1M' : `${t3Ctx / 1024}K`;
+    document.getElementById('t3-ctx-badge').textContent = `${ctxLbl} Bağlam · ${t3Slots} Slot`;
+
+    const totals = KV_ARCHS.map(a => (a.perTokBytes * t3Ctx + a.fixedBytes) * t3Slots);
+    const maxBytes = totals[0];
+
+    const listEl = document.getElementById('t3-kv-list');
+    listEl.innerHTML = '';
+    KV_ARCHS.forEach((a, i) => {
+      const b = totals[i];
+      const pct = Math.max(1.2, (b / maxBytes) * 100);
+      const row = document.createElement('div');
+      row.className = 'kv-row';
+      row.innerHTML = `
+        <div>
+          <div style="font-size:12.5px; font-weight:700; color:var(--text-0);">${a.name}</div>
+          <div style="font-size:11px; color:var(--text-2);">${a.sub}</div>
+        </div>
+        <div class="kv-bar-wrap">
+          <div class="kv-bar-fill" style="width:${pct.toFixed(2)}%; background:${a.color};"></div>
+        </div>
+        <div class="num" style="text-align:right; font-weight:700; font-size:13px; color:${a.color};">${fmtSize(b)}</div>
+      `;
+      listEl.appendChild(row);
+    });
+
+    const g4Gemma = totals[3];
+    const g4Ds41 = totals[5];
+    document.getElementById('t3-gpu-fit-summary').innerHTML =
+      `<strong>Donanım Sığma Özeti (${ctxLbl} × ${t3Slots} Slot):</strong> ` +
+      `Gemma 4 12B FP8 KV = <strong>${fmtSize(g4Gemma)}</strong> (7,2 GB ağırlık ile T4 15 GiB'e ~1M sınırında / 512K rahat sığar!) · ` +
+      `DeepSeek-V4.1-Flash = <strong>${fmtSize(g4Ds41)}</strong> · Klasik FP16 MHA = <strong>${fmtSize(maxBytes)}</strong> (tek H100/G4'e asla sığmaz!).`;
+
+    // Prefix Cache timeline
+    const prefBtn = document.getElementById('t3-prefix-toggle');
+    const prefBadge = document.getElementById('t3-prefix-badge');
+    const prefDesc = document.getElementById('t3-prefix-desc');
+    prefBtn.textContent = t3Warm ? '🔥 Warm Prefix Cache (cache_prompt=True)' : '❄️ Cold Prefill (Önbellek Kapalı)';
+    prefBadge.className = `badge ${t3Warm ? 'b-emerald' : 'b-rose'}`;
+    prefBadge.textContent = t3Warm ? 'Warm Hit · 2.380 Cached + 30 New' : 'Cold Miss · 0 Cached + 2.410 New';
+    prefDesc.textContent = t3Warm
+      ? 'Tur 2 geldiğinde ortak 2.380 tokenlık KV blokları bellekte hazır bulunur; yalnızca yeni 30 kullanıcı tokenı hesaplanır.'
+      : 'Önbellek kapalı veya kırıldığında 2.410 tokenın tamamı yeniden prefill GEMM ile hesaplanır.';
+    drawPrefixTimeline();
+    renderCaseStudy();
+  }
+
+  function drawPrefixTimeline() {
+    const svg = document.getElementById('t3-timeline-svg');
+    const ns = 'http://www.w3.org/2000/svg';
+    svg.innerHTML = '';
+    function el(tag, attrs, text) {
+      const node = document.createElementNS(ns, tag);
+      for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    // Row 1: Cold
+    svg.appendChild(el('text', { x: 14, y: 24, fill: '#fda4af', 'font-size': '11.5', 'font-weight': '700' }, '❄️ Cold Prefill (n_past = 0): 2.410 token GEMM'));
+    svg.appendChild(el('rect', { x: 14, y: 32, width: 410, height: 28, rx: 5, fill: 'rgba(251,113,133,0.28)', stroke: '#fb7185', 'stroke-width': 1.5 }));
+    svg.appendChild(el('text', { x: 219, y: 50, 'text-anchor': 'middle', fill: '#ffe4e6', 'font-size': '11', 'font-family': 'monospace' }, 'Sistem + Geçmiş Prefill (2.380 tok)'));
+    svg.appendChild(el('rect', { x: 428, y: 32, width: 32, height: 28, rx: 5, fill: 'rgba(251,191,36,0.32)', stroke: '#fbbf24' }));
+    svg.appendChild(el('text', { x: 444, y: 50, 'text-anchor': 'middle', fill: '#fef3c7', 'font-size': '10', 'font-family': 'monospace' }, '30'));
+    svg.appendChild(el('rect', { x: 464, y: 32, width: 82, height: 28, rx: 5, fill: 'rgba(56,189,248,0.28)', stroke: '#38bdf8' }));
+    svg.appendChild(el('text', { x: 505, y: 50, 'text-anchor': 'middle', fill: '#e0f2fe', 'font-size': '10.5', 'font-family': 'monospace' }, 'Decode'));
+
+    // Row 2: Warm
+    svg.appendChild(el('text', { x: 14, y: 92, fill: '#6ee7b7', 'font-size': '11.5', 'font-weight': '700' }, '🔥 Warm Prefix Cache (cache_prompt=True): 2.380 tok KV Hit → sadece 30 tok hesap!'));
+    svg.appendChild(el('rect', { x: 14, y: 100, width: 410, height: 28, rx: 5, fill: t3Warm ? 'rgba(52,211,153,0.12)' : 'rgba(100,116,139,0.1)', stroke: t3Warm ? '#34d399' : '#475569', 'stroke-dasharray': '5 3' }));
+    svg.appendChild(el('text', { x: 219, y: 118, 'text-anchor': 'middle', fill: t3Warm ? '#34d399' : '#64748b', 'font-size': '11', 'font-family': 'monospace' },
+      t3Warm ? '⚡ KV CACHE HIT (0 FLOP · 0 ms)' : '(Devre Dışı)'));
+    const warmStart = t3Warm ? 14 : 428;
+    svg.appendChild(el('rect', { x: warmStart, y: 100, width: 32, height: 28, rx: 5, fill: 'rgba(251,191,36,0.35)', stroke: '#fbbf24' }));
+    svg.appendChild(el('text', { x: warmStart + 16, y: 118, 'text-anchor': 'middle', fill: '#fef3c7', 'font-size': '10', 'font-family': 'monospace' }, '30'));
+    svg.appendChild(el('rect', { x: warmStart + 36, y: 100, width: 82, height: 28, rx: 5, fill: 'rgba(56,189,248,0.35)', stroke: '#38bdf8' }));
+    svg.appendChild(el('text', { x: warmStart + 77, y: 118, 'text-anchor': 'middle', fill: '#e0f2fe', 'font-size': '10.5', 'font-family': 'monospace' }, 'Decode'));
+
+    svg.appendChild(el('text', { x: 14, y: 156, fill: '#94a3b8', 'font-size': '11' },
+      t3Warm ? 'Sonuç: TTFT ~78× kısalır; Ajan araç döngülerinde her yeni tur yalnızca yeni gözlem tokenlarını işler.'
+             : 'Sonuç: Warm Cache kapalıyken her turda tüm konuşma geçmişi baştan hesaplanır.'));
+  }
+
+  // Case study state (false = broken, true = fixed)
+  const caseFixes = [false, false, false];
+  function renderCaseStudy() {
+    for (let i = 0; i < 3; i++) {
+      const card = document.getElementById(`case-fix-${i + 1}`);
+      const icon = document.getElementById(`case-icon-${i + 1}`);
+      card.className = `toggle-card ${caseFixes[i] ? 'fixed' : 'broken'}`;
+      icon.textContent = caseFixes[i] ? '✅' : '❌';
+    }
+    document.getElementById('case-desc-1').innerHTML = caseFixes[0]
+      ? '<code>enable_thinking=True + preserve_thinking=True</code> aktif: düşünce kanalı korunur, <strong>3 tokenlık sola kayma</strong> ortadan kalkar.'
+      : 'Tur 1\'de <code>&lt;|channel&gt;thought\\n&lt;channel|&gt;</code> eklenir; Tur 2 geçmişinde silinince yanıt <strong>3 token sola kayar</strong> ve eşleşme ~30. tokenda kopar.';
+    document.getElementById('case-desc-2').innerHTML = caseFixes[1]
+      ? '<code>--swa-full</code> / <code>--ctx-checkpoints 8</code> aktif: 1024 penceresi aşılınca bile önek durumu kurtarılır, <code>n_past=0</code> çöküşü olmaz.'
+      : '2.410 token &gt; 1.024 olunca baştaki SWA durumları pencereden düşer; <code>--cache-reuse</code> kapanır ve sunucu <code>n_past = 0</code> tam yeniden hesaba düşer.';
+    document.getElementById('case-desc-3').innerHTML = caseFixes[2]
+      ? '<code>id_slot: 0</code> sabitlendi: istek her zaman Slot 0\'a gider ve <code>/slots/0?action=save</code> gerçek KV durumunu diske kaydeder.'
+      : 'Benzerlik <code>30/2410 = %1,2 &lt; %10</code> (<code>slot_prompt_similarity=0.1</code>) kalınca istek boş <code>Slot 1</code>\'e gider; <code>/slots/0?action=save</code> ise <code>n_saved=0</code> döner!';
+
+    const badge = document.getElementById('t3-case-badge');
+    const tokBox = document.getElementById('t3-case-tokens');
+    tokBox.innerHTML = '';
+
+    const allFixed = caseFixes[0] && caseFixes[1] && caseFixes[2];
+    const t1Only = caseFixes[0] && !caseFixes[1];
+    let cached = 0, newTok = 2410, nSaved = 0;
+    if (allFixed) { cached = 2380; newTok = 30; nSaved = 2380; }
+    else if (caseFixes[0] && caseFixes[1] && !caseFixes[2]) { cached = 2380; newTok = 30; nSaved = '0 (Slot 1 riski!)'; }
+    else if (t1Only && caseFixes[2]) { cached = 30; newTok = 2380; nSaved = 30; }
+
+    badge.className = `badge ${allFixed ? 'b-emerald' : (cached > 0 ? 'b-amber' : 'b-rose')}`;
+    badge.textContent = `Cached: ${cached} | New: ${newTok} · kv_save.n_saved: ${nSaved}`;
+
+    const sampleTokens = [
+      { txt: '<|turn>user', hit: true },
+      { txt: 'Sistem+Soru (30 tok)', hit: true },
+      { txt: '<|turn>model', hit: caseFixes[0], shift: !caseFixes[0] },
+      { txt: '<|channel>thought', hit: caseFixes[0], shift: !caseFixes[0] },
+      { txt: 'CUTLASS yanit (2350 tok)', hit: caseFixes[0] && caseFixes[1], shift: !caseFixes[0] },
+      { txt: 'SWA>1024 Checkpoint', hit: caseFixes[1] },
+      { txt: caseFixes[2] ? 'Slot 0 (Sabit)' : 'LRU→Slot 1!', hit: caseFixes[2] || cached > 241 },
+      { txt: 'Yeni Soru (30 tok)', hit: false }
+    ];
+    sampleTokens.forEach((st, idx) => {
+      const sp = document.createElement('span');
+      const isLast = idx === sampleTokens.length - 1;
+      sp.className = 'tok-pill ' + (isLast ? 'shift' : st.hit ? 'hit' : (st.shift ? 'shift' : 'miss'));
+      sp.textContent = st.txt;
+      tokBox.appendChild(sp);
+    });
+  }
+
+  document.querySelectorAll('#t3-ctx-pills button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      t3Ctx = Number(btn.dataset.ctx);
+      document.querySelectorAll('#t3-ctx-pills button').forEach(b => b.classList.toggle('active-pill', b === btn));
+      renderTab3();
+    });
+  });
+  document.querySelectorAll('#t3-slot-pills button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      t3Slots = Number(btn.dataset.slots);
+      document.querySelectorAll('#t3-slot-pills button').forEach(b => b.classList.toggle('active-pill', b === btn));
+      renderTab3();
+    });
+  });
+  document.getElementById('t3-prefix-toggle').addEventListener('click', () => {
+    t3Warm = !t3Warm;
+    renderTab3();
+  });
+  [0, 1, 2].forEach(i => {
+    const c = document.getElementById(`case-fix-${i + 1}`);
+    c.addEventListener('click', () => { caseFixes[i] = !caseFixes[i]; renderCaseStudy(); });
+    c.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); caseFixes[i] = !caseFixes[i]; renderCaseStudy(); } });
+  });
+
+  /* ==================== TAB 4: SAF DECODE vs MTP vs DFLASH & 2026 ARCHITECTURES ==================== */
+  const t4AlphaSl = document.getElementById('t4-alpha');
+  const t4MtpMode = document.getElementById('t4-mtp-mode');
+  const t4DflashSel = document.getElementById('t4-dflash-block');
+
+  let t4Timer = null;
+  let t4StepIdx = 0;
+  let t4L1 = [], t4L2 = [], t4L3 = [];
+  let t4L1Cnt = 0, t4L2Cnt = 0, t4L3Cnt = 0;
+
+  function calcTab4Speeds() {
+    const alpha = Number(t4AlphaSl.value);
+    const isBatch = t4MtpMode.value === 'batch';
+    const dBlock = Number(t4DflashSel.value);
+
+    // Base tok/s: Single user T4/G4-like reference (44 tok/s) vs Batch=8 G4 vLLM (235 base -> 619.2 with MTP)
+    const baseTps = isBatch ? 260 : 44;
+    // Sequential MTP (gamma=5): expected tokens per verify = (1 - alpha^6)/(1 - alpha), overhead ~18% for 4L 253MB sequential draft + verify
+    const gamma = 5;
+    const expMtpTok = (1 - Math.pow(alpha, gamma + 1)) / (1 - alpha);
+    const mtpOverhead = isBatch ? 1.24 : 1.18;
+    const mtpSpeedup = expMtpTok / mtpOverhead;
+    const mtpTps = baseTps * mtpSpeedup;
+
+    // DFLASH (block diffusion: 1 parallel forward for 8-16 tokens + 1 mini-GEMM verify -> very low draft cost ~1.12x)
+    const expDflashTok = 1 + (dBlock - 1) * Math.pow(alpha, 1.35);
+    const dflashOverhead = 1.16;
+    const dflashSpeedup = expDflashTok / dflashOverhead;
+    const dflashTps = baseTps * dflashSpeedup;
+
+    return { alpha, isBatch, dBlock, baseTps, expMtpTok, mtpSpeedup, mtpTps, expDflashTok, dflashSpeedup, dflashTps };
+  }
+
+  function renderTab4Header() {
+    const s = calcTab4Speeds();
+    document.getElementById('t4-alpha-val').textContent = `${s.alpha.toFixed(2)} (%${Math.round(s.alpha * 100)})`;
+    document.getElementById('t4-l1-tps').textContent = `${fmtInt(s.baseTps)} tok/s (1,00×)`;
+    document.getElementById('t4-l2-tps').textContent = `${fmtInt(s.mtpTps)} tok/s (${s.mtpSpeedup.toFixed(2)}×)`;
+    document.getElementById('t4-l3-tps').textContent = `${fmtInt(s.dflashTps)} tok/s (${s.dflashSpeedup.toFixed(2)}×)`;
+
+    document.getElementById('t4-mtp-badge').textContent = s.isBatch
+      ? 'Continuous Batching (N=8) · Draft + 1 Mini-GEMM'
+      : 'Tek Kullanıcı · Sıralı 5 Draft → 1 Mini-GEMM';
+    document.getElementById('t4-mtp-note').textContent = s.isBatch
+      ? 'MTP çok kullanıcılı batching’de de çalışır: G4 vLLM 8-Oturum MTP5 = 619,2 tok/s!'
+      : '253 MB 4-katmanlı assistant taslak üretir, ana model tek mini-GEMM ile kayıpsız doğrular.';
+    document.getElementById('t4-dflash-badge').textContent = `1 Paralel Forward (${s.dBlock} tok) → 1 Mini-GEMM Verify`;
+  }
+
+  function renderRaceTracks() {
+    const draw = (id, arr) => {
+      const box = document.getElementById(id);
+      box.innerHTML = '';
+      const slice = arr.slice(-28);
+      slice.forEach(item => {
+        const span = document.createElement('span');
+        span.className = `r-tok ${item.cls}`;
+        span.textContent = item.txt;
+        box.appendChild(span);
+      });
+    };
+    draw('t4-l1-track', t4L1);
+    draw('t4-l2-track', t4L2);
+    draw('t4-l3-track', t4L3);
+    document.getElementById('t4-l1-cnt').textContent = t4L1Cnt;
+    document.getElementById('t4-l2-cnt').textContent = t4L2Cnt;
+    document.getElementById('t4-l3-cnt').textContent = t4L3Cnt;
+    document.getElementById('t4-race-summary').textContent = `Adım: ${t4StepIdx} · Yeşil=Kabul, Sarı=Bonus, Kırmızı=Rollback`;
+  }
+
+  function stepRace() {
+    const s = calcTab4Speeds();
+    t4StepIdx++;
+    // Lane 1: always 1 token
+    t4L1Cnt += 1;
+    t4L1.push({ cls: 'r-base', txt: `t${t4L1Cnt}` });
+
+    // Lane 2: MTP draft 5 sequential, accept prefix until first reject, +1 bonus
+    let acc2 = 0;
+    let rejected2 = false;
+    for (let i = 0; i < 5; i++) {
+      if (!rejected2 && Math.random() < s.alpha) {
+        acc2++;
+        t4L2Cnt++;
+        t4L2.push({ cls: 'r-acc', txt: `✓` });
+      } else if (!rejected2) {
+        rejected2 = true;
+        t4L2.push({ cls: 'r-rej', txt: '✕' });
+      }
+    }
+    t4L2Cnt++;
+    t4L2.push({ cls: 'r-bonus', txt: '+1' });
+
+    // Lane 3: DFLASH parallel block (8 or 16)
+    const blk = s.dBlock;
+    let rejected3 = false;
+    for (let i = 0; i < Math.min(blk, 10); i++) {
+      if (!rejected3 && Math.random() < Math.pow(s.alpha, 0.9)) {
+        t4L3Cnt += (blk === 16 && i % 2 === 0 ? 2 : 1);
+        t4L3.push({ cls: 'r-dflash', txt: blk === 16 && i % 2 === 0 ? '2✓' : '✓' });
+      } else if (!rejected3) {
+        rejected3 = true;
+        t4L3.push({ cls: 'r-rej', txt: '✕' });
+      }
+    }
+    t4L3Cnt++;
+    t4L3.push({ cls: 'r-bonus', txt: '+1' });
+
+    renderRaceTracks();
+  }
+
+  function resetRace() {
+    if (t4Timer) { clearInterval(t4Timer); t4Timer = null; }
+    t4StepIdx = 0; t4L1 = []; t4L2 = []; t4L3 = [];
+    t4L1Cnt = 0; t4L2Cnt = 0; t4L3Cnt = 0;
+    renderTab4Header();
+    renderRaceTracks();
+  }
+
+  document.getElementById('t4-play').addEventListener('click', () => {
+    if (t4Timer) return;
+    t4Timer = setInterval(stepRace, 480);
+  });
+  document.getElementById('t4-pause').addEventListener('click', () => {
+    if (t4Timer) { clearInterval(t4Timer); t4Timer = null; }
+  });
+  document.getElementById('t4-reset').addEventListener('click', resetRace);
+  [t4AlphaSl, t4MtpMode, t4DflashSel].forEach(el => el.addEventListener('input', renderTab4Header));
+
+  /* ==================== TAB 4: 2026 FRONTIER ARCHITECTURES & PARETO ==================== */
+  const ARCH_CARDS = [
+    {
+      id: 'gemma4_12b', name: 'Gemma 4 12B', tag: '40 SWA@1024 + 8 Global 1KV (K=V)',
+      eff: 78, evalScore: 76, color: '#38bdf8',
+      focus: 'Yerel/Tek GPU (T4/L4) Uzun Bağlam & MTP Hızı',
+      detail: '48 katmanda yalnızca 8 global dikkat katmanıyla 4 KB/tok FP8 KV harcar; Tesla T4 üzerinde dahi 512K GPU KV + %80,11 MTP ile canlı çok adımlı ajan çalıştırır.'
+    },
+    {
+      id: 'gemma4_26b', name: 'Gemma 4 26B A4B', tag: 'Sparse MoE · 26B Toplam / 4B Aktif',
+      eff: 92, evalScore: 83, color: '#34d399',
+      focus: 'Memory-Wall Kırıcı (4B Ağırlık Okuma Maliyeti)',
+      detail: '26B parametre bilgi kapasitesini token başına sadece 4B aktif ağırlık okuyarak sunar; bellek duvarına takılan kartlarda kalite/hız Pareto sınırını ileri taşır.'
+    },
+    {
+      id: 'qwen38_27b', name: 'Qwen 3.8 27B', tag: '3:1 Hibrit (48 Gated DeltaNet + 16 Full)',
+      eff: 68, evalScore: 91, color: '#fbbf24',
+      focus: 'Derin Akıl Yürütme (xhigh) & Tool/JSON Schema Evals',
+      detail: 'Katmanların %75\'i sabit durumlu Gated DeltaNet olduğu için bellek baskısı düşer; G4 üzerinde reasoning_effort="xhigh" ile karmaşık araç çağrısı ve kod değerlendirmelerini optimize eder.'
+    },
+    {
+      id: 'ds_v4_flash', name: 'DeepSeek-V4-Flash', tag: 'MoE + Latent KV (~3,5 KB/tok)',
+      eff: 86, evalScore: 87, color: '#2dd4bf',
+      focus: 'Yüksek Eşzamanlı ($/1M Token) Üretim Servisi',
+      detail: 'Latent KV sıkıştırmasıyla (~3,5 KB/tok) Continuous Batching altında onlarca ajanı aynı GPU\'da barındırarak $/1M token maliyetini kırar.'
+    },
+    {
+      id: 'ds_v41_flash', name: 'DeepSeek-V4.1-Flash', tag: 'CED + CSA2 + FP4 KV = 890 B/tok',
+      eff: 96, evalScore: 90, color: '#a78bfa',
+      focus: '1M Bağlamda <0,9 GB KV + Ultra Düşük Joule/Token',
+      detail: '16B FP4 aktif decode (~9 GB) ve 890 B/tok KV ile 1 milyon tokenda bile 1 GB altı KV ayak izi bırakır; uzun bağlamlı ajan filoları için en yüksek verim noktasındadır.'
+    },
+    {
+      id: 'kimi31_pro', name: 'Kimi 3.1 Pro', tag: 'Uzun Ufuklu Ajan MoE & Çok Turlu Tool-Use',
+      eff: 74, evalScore: 95, color: '#fb7185',
+      focus: 'Long-Horizon Agent & SWE/Terminal Evals',
+      detail: 'Yüz binlerce tokenlık depo ve çok turlu araç çağrısı zincirlerinde tutarlılığı maksimize eder; zorlu uzun ufuklu ajan benchmarklarında tavan kaliteye odaklanır.'
+    }
+  ];
+
+  let selectedArchId = 'ds_v41_flash';
+  function renderArchPareto() {
+    const cardsBox = document.getElementById('t4-arch-cards');
+    cardsBox.innerHTML = '';
+    ARCH_CARDS.forEach(a => {
+      const card = document.createElement('div');
+      card.className = `arch-card ${a.id === selectedArchId ? 'selected' : ''}`;
+      card.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+          <strong style="font-size:13px; color:${a.color};">${a.name}</strong>
+          <span class="num" style="font-size:11px; color:var(--text-2);">Eval ${a.evalScore}</span>
+        </div>
+        <div style="font-size:11.5px; color:var(--text-0); margin-top:3px;">${a.tag}</div>
+        <div style="font-size:11px; color:var(--text-2); margin-top:4px;">🎯 ${a.focus}</div>
+      `;
+      card.addEventListener('click', () => { selectedArchId = a.id; renderArchPareto(); });
+      cardsBox.appendChild(card);
+    });
+
+    const sel = ARCH_CARDS.find(a => a.id === selectedArchId) || ARCH_CARDS[0];
+    document.getElementById('t4-arch-detail').innerHTML =
+      `<strong style="color:${sel.color};">${sel.name} — ${sel.focus}:</strong> ${sel.detail}`;
+
+    const svg = document.getElementById('t4-pareto-svg');
+    const ns = 'http://www.w3.org/2000/svg';
+    svg.innerHTML = '';
+    function el(tag, attrs, text) {
+      const node = document.createElementNS(ns, tag);
+      for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    const mapX = eff => 55 + ((eff - 60) / 40) * 470;
+    const mapY = ev => 210 - ((ev - 70) / 30) * 180;
+
+    [65, 75, 85, 95].forEach(e => {
+      const x = mapX(e);
+      svg.appendChild(el('line', { x1: x, y1: 18, x2: x, y2: 210, stroke: '#162238' }));
+      svg.appendChild(el('text', { x: x, y: 226, 'text-anchor': 'middle', fill: '#64748b', 'font-size': '10', 'font-family': 'monospace' }, e));
+    });
+    [75, 80, 85, 90, 95].forEach(v => {
+      const y = mapY(v);
+      svg.appendChild(el('line', { x1: 55, y1: y, x2: 525, y2: y, stroke: '#162238' }));
+      svg.appendChild(el('text', { x: 46, y: y + 3, 'text-anchor': 'end', fill: '#64748b', 'font-size': '10', 'font-family': 'monospace' }, v));
+    });
+
+    svg.appendChild(el('text', { x: 290, y: 242, 'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '10.5' }, 'Etkin Maliyet / Hız Verimliliği (KV + Aktif Parametre) →'));
+    svg.appendChild(el('text', { x: 14, y: 115, 'text-anchor': 'middle', fill: '#94a3b8', 'font-size': '10.5', transform: 'rotate(-90 14 115)' }, 'Ajan & Eval Skoru →'));
+
+    // Pareto frontier dashed line: Gemma4 26B A4B -> DeepSeek V4.1 Flash -> Kimi 3.1 Pro
+    const frontier = [ARCH_CARDS[1], ARCH_CARDS[4], ARCH_CARDS[5]].sort((a, b) => a.eff - b.eff);
+    svg.appendChild(el('polyline', {
+      points: frontier.map(p => `${mapX(p.eff).toFixed(1)},${mapY(p.evalScore).toFixed(1)}`).join(' '),
+      fill: 'none', stroke: '#475569', 'stroke-dasharray': '5 4', 'stroke-width': 1.5
+    }));
+
+    ARCH_CARDS.forEach(a => {
+      const cx = mapX(a.eff), cy = mapY(a.evalScore);
+      const isSel = a.id === selectedArchId;
+      const g = el('g', { style: 'cursor:pointer' });
+      g.appendChild(el('circle', {
+        cx, cy, r: isSel ? 9 : 6, fill: a.color,
+        stroke: isSel ? '#f8fafc' : '#060a13', 'stroke-width': isSel ? 2.5 : 1.5
+      }));
+      g.appendChild(el('text', {
+        x: cx, y: cy - 12, 'text-anchor': 'middle',
+        fill: isSel ? '#f8fafc' : a.color, 'font-size': isSel ? '11.5' : '10.5', 'font-weight': '700'
+      }, a.name));
+      g.addEventListener('click', () => { selectedArchId = a.id; renderArchPareto(); });
+      svg.appendChild(g);
+    });
+  }
+
+  /* ==================== SLIDE-OUT DRAWER & PYTORCH CODE ==================== */
+  const PYTORCH_REF = `import math, torch, torch.nn as nn, torch.nn.functional as F
+
+class Gemma4MiniBlock(nn.Module):
+    def __init__(self, d=3840, n_q=16, is_global=False):
+        super().__init__()
+        self.is_global = is_global
+        self.n_q, self.n_kv = n_q, (1 if is_global else 8)
+        self.d_h = 512 if is_global else 256
+        self.ln1 = nn.RMSNorm(d)
+        self.q_proj = nn.Linear(d, n_q * self.d_h, bias=False)
+        self.k_proj = nn.Linear(d, self.n_kv * self.d_h, bias=False)
+        self.v_proj = None if is_global else nn.Linear(d, self.n_kv * self.d_h, bias=False)
+        self.o_proj = nn.Linear(n_q * self.d_h, d, bias=False)
+        self.ln2 = nn.RMSNorm(d)
+        self.gate = nn.Linear(d, 15360, bias=False)   # GeGLU d_ff=15360
+        self.up   = nn.Linear(d, 15360, bias=False)
+        self.down = nn.Linear(15360, d, bias=False)
+
+    def forward(self, x, kv_cache=None):
+        B, T, _ = x.shape
+        h = self.ln1(x)
+        q = self.q_proj(h).view(B, T, self.n_q, self.d_h).transpose(1, 2)
+        k = self.k_proj(h).view(B, T, self.n_kv, self.d_h).transpose(1, 2)
+        v = k if self.is_global else self.v_proj(h).view(B, T, self.n_kv, self.d_h).transpose(1, 2)
+        if not self.is_global and T > 1024:           # Sliding Window @ 1024
+            k, v = k[:, :, -1024:], v[:, :, -1024:]
+        k = k.repeat_interleave(self.n_q // self.n_kv, dim=1)
+        v = v.repeat_interleave(self.n_q // self.n_kv, dim=1)
+        attn = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        x = x + self.o_proj(attn.transpose(1, 2).reshape(B, T, -1))
+        m = self.ln2(x)
+        return x + self.down(F.gelu(self.gate(m), approximate="tanh") * self.up(m))
+
+class Gemma4MiniModel(nn.Module):
+    def __init__(self, V=262144, d=3840, L=48, softcap=30.0):
+        super().__init__()
+        self.embed = nn.Embedding(V, d)
+        self.softcap = softcap
+        # 48 katman: her 6 katmanda 5 sliding@1024 + 1 global (40 sliding + 8 global)
+        self.layers = nn.ModuleList([
+            Gemma4MiniBlock(d=d, is_global=((i + 1) % 6 == 0)) for i in range(L)
+        ])
+        self.norm = nn.RMSNorm(d)
+
+    def forward(self, ids):
+        x = self.embed(ids) * math.sqrt(self.embed.embedding_dim)
+        for layer in self.layers:
+            x = layer(x)
+        logits = F.linear(self.norm(x), self.embed.weight)  # tied E^T
+        return self.softcap * torch.tanh(logits / self.softcap)`;
+
+  document.getElementById('pytorch-code').textContent = PYTORCH_REF;
+
+  const drawer = document.getElementById('math-drawer');
+  const backdrop = document.getElementById('drawer-backdrop');
+  function setDrawer(open) {
+    drawer.classList.toggle('open', open);
+    backdrop.classList.toggle('open', open);
+    drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+  }
+  document.getElementById('btn-drawer-open').addEventListener('click', () => setDrawer(true));
+  document.getElementById('btn-drawer-close').addEventListener('click', () => setDrawer(false));
+  backdrop.addEventListener('click', () => setDrawer(false));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') setDrawer(false); });
+
+  document.getElementById('btn-copy-pytorch').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-copy-pytorch');
+    try {
+      await navigator.clipboard.writeText(PYTORCH_REF);
+      btn.textContent = '✅ Kopyalandı';
+      setTimeout(() => { btn.textContent = '📋 Kodu Kopyala'; }, 1600);
+    } catch (_) {
+      btn.textContent = 'Seçip Ctrl+C yapın';
+      setTimeout(() => { btn.textContent = '📋 Kodu Kopyala'; }, 2000);
+    }
+  });
+
+  /* ==================== TAB SWITCHING & GLOBAL CONTROLS ==================== */
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        const active = b === btn;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => {
+        p.classList.toggle('active', p.id === target);
+      });
+    });
+  });
+
+  document.getElementById('btn-fullscreen').addEventListener('click', () => {
+    const fsBtn = document.getElementById('btn-fullscreen');
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+      root.classList.remove('expanded-view');
+      fsBtn.textContent = '⛶ Tam Ekran';
+      return;
+    }
+    if (root.requestFullscreen) {
+      root.requestFullscreen().then(() => {
+        fsBtn.textContent = '✕ Çık';
+      }).catch(() => {
+        root.classList.toggle('expanded-view');
+        fsBtn.textContent = root.classList.contains('expanded-view') ? '✕ Küçült' : '⛶ Tam Ekran';
+      });
+    } else {
+      root.classList.toggle('expanded-view');
+      fsBtn.textContent = root.classList.contains('expanded-view') ? '✕ Küçült' : '⛶ Tam Ekran';
+    }
+  });
+
+  /* ==================== ANIMATION LOOP & INIT ==================== */
+  t1HwSel.addEventListener('change', renderTab1);
+  t1ModSel.addEventListener('change', renderTab1);
+  document.getElementById('t1-anim-toggle').addEventListener('click', () => {
+    t1AnimRunning = !t1AnimRunning;
+    document.getElementById('t1-anim-toggle').textContent = t1AnimRunning ? '⏸ Akışı Duraklat' : '▶ Akışı Sürdür';
+  });
+
+  function animLoop() {
+    if (t1AnimRunning) {
+      t1AnimTick = (t1AnimTick + 1) % 100000;
+      updateTab1Packets();
+    }
+    requestAnimationFrame(animLoop);
+  }
+
+  renderTab1();
+  renderTab2();
+  renderTab3();
+  renderTab4Header();
+  stepRace(); stepRace(); stepRace();
+  renderArchPareto();
+  requestAnimationFrame(animLoop);
+})();
+</script>
+</body>
+</html>

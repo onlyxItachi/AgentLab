@@ -31,7 +31,14 @@ This starter glossary is not a complete reference for the course. Session-specif
 | Trust Boundary | The boundary separating untrusted inputs/LLM proposals, the trusted harness policy gate, and privileged OS resources—enforced via least-privilege `read`/`write`/`exec` `allow`/`deny` rules and `secret stripping`. |
 | Human-in-the-Loop (HITL) | An approval gate pausing risky, destructive, or external actions to display the model's `Thinking` trace and exact command for explicit `[Onayla]` / `[Reddet]` (`[Approve]` / `[Reject]`) human intervention. |
 | Durable Execution | Execution architecture saving step `checkpoint` state and Google Drive persistence so long-running or HITL-paused workflows recover cleanly via `resume` across disconnects. |
-| Studio v2 | The zero-flag-hunting **7-cell `#@title` form** UX in Session 03 and 04 notebooks, combining one-click setup, independent experiments, the portless `google.colab.output` JS RPC `Canlı Stüdyo` WebUI, `DualLayerSessionStore`, and safe VM teardown. |
+| Studio v2 | The zero-flag-hunting **7-cell `#@title` form** UX in Session 03–05 notebooks, combining one-click setup, independent experiments, the portless `google.colab.output` JS RPC `Canlı Stüdyo` WebUI, `DualLayerSessionStore`, and safe VM teardown. |
 | ALAB-Exx | Standardized 2-line error card (`ALAB-E01`–`ALAB-E99`) replacing raw Python tracebacks across AgentLab Colab notebooks, mapped to step-by-step fixes in `error-guide.pdf`. |
+| Roofline & Memory Wall | The performance model distinguishing memory-bandwidth-limited single-stream decode (`GEMV`) from compute-bound prefill or batched matrix multiplications (`GEMM`). |
+| Chunked Prefill & Continuous Batching | Serving technique that splits prompt ingestion (`--ubatch-size` `GEMM` chunks) and schedules active slot iterations together to saturate `Tensor Cores` without stalling running requests. |
+| Prefix Caching | Reusing cached KV blocks (`cache_prompt=True`) for unchanged system prompts and tool schemas so repeated turns skip redundant prefill work and slash `TTFT`. |
+| Speculative Decoding (MTP & DFLASH) | Lossless decoding acceleration where lightweight multi-token heads (`MTP`) or parallel block diffusion (`DFLASH`) propose multiple draft tokens verified in one target-model pass. |
+| Joule/Token & $/1M Token | Production energy efficiency (`Watt / tok_s`) and per-million-token inference economics measuring how batching and hardware bandwidth reduce per-token cost. |
+| Observability & Span Tracing | Telemetry discipline combining server `/metrics` and `timings` with structured `llm_prefill`, `llm_decode`, and `tool_exec` spans to pinpoint latency bottlenecks. |
+| Trajectory Eval & LLM-as-a-Judge | Multi-layer evaluation verifying deterministic tool/step trajectories alongside rubric-based `LLM-as-a-Judge` scoring for open-ended reasoning quality. |
 
 The glossary will grow alongside the session materials.
